@@ -169,46 +169,116 @@ namespace Dune
     template<std::size_t level>
     struct JacobiStepWithDefect
     {
-      template<typename M, typename X, typename Y, typename K>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
+      template<typename M, typename X, typename Y>
+      static void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
       {
+        typedef typename M::ConstRowIterator RowIterator;
+        typedef typename M::ConstColIterator ColIterator;
+        typedef typename Y::block_type YBlock;
+
+        typename Y::iterator dIter=d.begin();
+        typename Y::const_iterator bIter=b.begin();
+        typename X::iterator xIter=x.begin();
+
+        // a jacobi-intrinsic problem: we need the entire old x until the end of the computation
+        const X xold(x);
+
+        for(RowIterator row=A.begin(), end=A.end(); row != end;
+            ++row, ++dIter, ++xIter, ++bIter)
+        {
+          YBlock r = *bIter;
+
+          ColIterator col = row->begin();
+          ColIterator colEnd = row->end();
+          for (; col.index() < row.index(); ++col)
+            col->mmv(xold[col.index()],r);
+
+          ColIterator diag = col;
+
+          for (++col; col != colEnd; ++col)
+            col->mmv(xold[col.index()],r);
+
+          //TODO recursion
+          diag->solve(*xIter,r);
+
+          if (compDef)
+          {
+            *dIter = *bIter;
+            col = row->begin();
+            for (; col != colEnd; ++col)
+              col->mmv(x[col.index()],*dIter);
+          }
+        }
+                  // precious debug code
+        if (compDef)
+        {
+          Y newdef(b);
+          typename Y::iterator dit = newdef.begin();
+          typename X::iterator xit = x.begin();
+          for (RowIterator row = A.begin(); row != A.end(); ++row, ++xit, ++dit)
+            for(ColIterator col = row->begin(); col!=row->end(); ++col)
+              col->mmv(x[col.index()], *dit);
+              //col->mmv(*xit, d[col.index()]);
+          for (int i=0; i<newdef.size(); i++)
+            std::cout << newdef[i] << " " << d[i] << std::endl;
+           // if (std::abs(newdef[i][0]-d[i][0])>1e-4)
+             // DUNE_THROW(Dune::Exception,"Falschen Defekt berechnet");
+        }
 
       }
 
-      template<typename M, typename X, typename Y, typename K>
-      static void backward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
-      {}
-    };
+      template<typename M, typename X, typename Y>
+      static void backward_apply(const M& A, X& x, Y& d, const Y& b)
+      {
+        typedef typename M::ConstRowIterator RowIterator;
+        typedef typename M::ConstColIterator ColIterator;
+        typedef typename Y::block_type YBlock;
 
-    template<>
-    struct JacobiStepWithDefect<0>
-    {
-      template<typename M, typename X, typename Y, typename K>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
-      {}
+        typename Y::iterator dIter=d.beforeEnd();
+        typename X::iterator xIter=x.beforeEnd();
+        typename Y::const_iterator bIter=b.beforeEnd();
 
-      template<typename M, typename X, typename Y, typename K>
-      static void backward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
-      {}
+        // a jacobi-intrinsic problem: we need the entire old x until the end of the computation
+        const X xold(x);
+
+        for(RowIterator row=A.beforeEnd(), end=A.beforeBegin(); row != end;
+            --row, --dIter, --xIter, --bIter)
+        {
+          YBlock r = *bIter;
+          ColIterator endCol=(*row).beforeBegin();
+          ColIterator col=(*row).beforeEnd();
+          for (; col.index()>row.index(); --col)
+            (*col).mmv(xold[col.index()],r);     // d -= sum_{i>j} a_ij * xnew_j
+
+          ColIterator diag=col;
+
+          for (--col; col!=endCol; --col)
+            (*col).mmv(xold[col.index()],r);     // d -= sum_{j<i} a_ij * xold_j
+
+          diag->solve(*xIter,r);
+        }
+
+      }
     };
 
     struct JacobiPresmoothDefect
     {
-      template<typename M, typename X, typename Y, typename K>
-      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
+      template<typename M, typename X, typename Y>
+      static void apply(const M& A, X& x, Y& d, const Y& b, int num_iter)
       {
-        for (int i=0; i<num_iter; i++)
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w);
+        for (int i=0; i<num_iter-1; i++)
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,false);
+        JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
       }
     };
 
     struct JacobiPostsmoothDefect
     {
-      template<typename M, typename X, typename Y, typename K>
-      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
+      template<typename M, typename X, typename Y>
+      static void apply(const M& A, X& x, Y& d, const Y& b, int num_iter)
       {
         for (int i=0; i<num_iter; i++)
-          JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b,w);
+          JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
       }
     };
 
