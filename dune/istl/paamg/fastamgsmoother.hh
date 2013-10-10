@@ -183,6 +183,8 @@ namespace Dune
         // a jacobi-intrinsic problem: we need the entire old x until the end of the computation
         const X xold(x);
 
+        d=b;
+
         for(RowIterator row=A.begin(), end=A.end(); row != end;
             ++row, ++dIter, ++xIter, ++bIter)
         {
@@ -203,13 +205,13 @@ namespace Dune
 
           if (compDef)
           {
-            *dIter = *bIter;
+            //*dIter = *bIter;
             col = row->begin();
             for (; col != colEnd; ++col)
-              col->mmv(x[col.index()],*dIter);
+              col->mmv(*xIter,d[col.index()]);
           }
         }
-                  // precious debug code
+        // precious debug code
         if (compDef)
         {
           Y newdef(b);
@@ -218,11 +220,9 @@ namespace Dune
           for (RowIterator row = A.begin(); row != A.end(); ++row, ++xit, ++dit)
             for(ColIterator col = row->begin(); col!=row->end(); ++col)
               col->mmv(x[col.index()], *dit);
-              //col->mmv(*xit, d[col.index()]);
           for (int i=0; i<newdef.size(); i++)
-            std::cout << newdef[i] << " " << d[i] << std::endl;
-           // if (std::abs(newdef[i][0]-d[i][0])>1e-4)
-             // DUNE_THROW(Dune::Exception,"Falschen Defekt berechnet");
+            if (std::abs(newdef[i][0]-d[i][0])>1e-4)
+              DUNE_THROW(Dune::Exception,"Falschen Defekt berechnet");
         }
 
       }
