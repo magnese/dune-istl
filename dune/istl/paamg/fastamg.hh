@@ -638,7 +638,7 @@ namespace Dune
                                         x,
                                         *levelContext.residual,
                                         b,
-                                        preSteps_
+                                        2//preSteps_
                                        );
     }
 
@@ -646,8 +646,8 @@ namespace Dune
     void FastAMG<M,X,PI,A>
     ::postsmooth(LevelContext& levelContext, Domain& x, const Range& b)
     {
-      GaussSeidelPostsmoothDefect<M::matrix_type::blocklevel>
-      ::apply(levelContext.matrix->getmat(), x, *levelContext.residual, b);
+      GaussSeidelPostsmoothDefect
+      ::apply(levelContext.matrix->getmat(), x, *levelContext.residual, b,2);
     }
 
 
