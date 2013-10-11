@@ -288,6 +288,26 @@ namespace Dune
           JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
       }
     };
+//TODO this cannot work. we need an object for ilu smoothing
+//     template<typename M>
+//     class ILUSmoothDefect
+//     {
+//       public:
+//
+//
+//       template<typename X, typename Y>
+//       static void apply(const M& A, X& x, Y& d, const Y& b)
+//       {
+//         if (ilu_decomp.find(&A) == ilu_decomp.end())
+//         {
+//           ilu_decomp.insert(std::make_pair(&A, new M(A)));
+//           bilu0_decomposition(*ilu_decomp[&A]);
+//         }
+//       }
+//
+//       private:
+//       std::map<const M*,M*> ilu_decomp;
+//     };
 
 
   } // end namespace Amg
