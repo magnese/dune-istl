@@ -1,0 +1,108 @@
+\documentclass{article}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\begin{document}
+
+\section{Defect Calculation}
+
+The defect of a system given a solution $x^k$ is defined as 
+\begin{equation}
+d=b-Ax^k
+\end{equation}
+This can be calculated with the following simple algorithm:
+\begin{algorithm}
+\caption{Defect Calculation}
+\label{alg:def}
+\begin{algorithmic}[1]
+\State $d\gets b$
+\For {$i=0,\dots ,n$}
+  \For {$j=0,\dots ,n$}
+    \State $d_i\gets d_i-a_{ij}x_j$ \label{line:crux}
+  \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{Jacobi Preconditioner}
+
+A Jacobi Preconditioner:
+
+\begin{equation}
+x_i^{k+1}=a_{ii}^{-1}\left(b_i-\sum_{j\neq i}a_{ij}x_j^k\right)
+\end{equation}
+
+this is done algorithmically with
+\begin{algorithm}
+\caption{Jacobi Preconditioner}
+\label{alg:jac}
+\begin{algorithmic}[1]
+\State $x^{old}\gets x$
+\For {$i=0,\dots ,n-1$ matrix rows}
+  \State $r\gets b_i$
+  \For {$j\neq i$ matrix columns}
+    \State $r \gets r - a_{ij}x_j^{old}$
+  \EndFor
+  \State $x_i \gets r/a_{ii}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+The challenge is to combine algorithms~\ref{alg:def} and \ref{alg:jac} into one algorithm with one outer loop over the matrix rows, to improve memory access. This is not possible without modification as the entries of the new $x$ needed in line~\ref{line:crux} are not yet available. However, you can switch inner and outer loop of algorithm~\ref{alg:def} and use symmetry of the matrix A to obtain $d_j\gets d_j-a_{ij}x_i$ instead. These algorithms may then be combined into algorithm~\ref{alg:jacnew}.
+\begin{algorithm}
+\caption{Jacobi Preconditioner with Simulataneous Defect Calculation}
+\label{alg:jacnew}
+\begin{algorithmic}[1]
+\State $x^{old}\gets x$
+\State $d\gets b$
+\For {$i=0,\dots ,n-1$ matrix rows}
+  \State $r\gets b_i$
+  \For {$j\neq i$ matrix columns}
+    \State $r \gets r - a_{ij}x_j^{old}$
+  \EndFor
+  \State $x_i \gets r/a_{ii}$
+  \For {$j=0,\dots ,n$}
+    \State $d_j\gets d_j-a_{ij}x_i$
+  \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+For further enhancements when doing multiple steps of Jacobi preconditioning the algorithm may be told whether this is the first or last step. The first step is quite trivial due to $x^o=0$, the defect is only to be computed in the last iteration. This results in algorithm~\ref{alg:full}, which is only valid for the forward smmothing step, in the backward step neither a defect has to be calculated, nor $x^0=0$. Thus the backwards step looks exaclty like algorithm~\ref{alg:jac}.
+
+\begin{algorithm}
+\caption{The full algorithm}
+\label{alg:full}
+\begin{algorithmic}[1]
+\If {$last$}
+  \State $d\gets b$
+\EndIf
+\If {$first$}
+  \For {$i=0,\dots ,n-1$}
+    \State $x_i\gets b_i/a_{ii}$
+  \EndFor
+  \If {$last$}
+    \For {$j=0,\dots ,n-1$}
+      \State $d_j\gets d_j - a_{ij}x_{i}$
+    \EndFor
+  \EndIf
+\Else
+  \State $x^{old}\gets x$
+  \For {$i=0,\dots ,n-1$}
+    \State $r\gets b_i$
+    \For {$j\neq i$}
+      \State $r\gets r-a_{ij}x^{old}_j$
+    \EndFor
+    \State $x_i\gets r/a_{ii}$
+    \If {$last$}
+      \For {$j=0,\dots ,n-1$}
+        \State $d_j\gets d_j - a_{ij}x_{i}$
+      \EndFor
+    \EndIf
+  \EndFor
+\EndIf
+
+\end{algorithmic}
+\end{algorithm}
+\end{document}
