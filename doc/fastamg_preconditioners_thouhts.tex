@@ -25,6 +25,25 @@ This can be calculated with the following simple algorithm:
 \end{algorithmic}
 \end{algorithm}
 
+Assuming that A is symmetric this can also be calculated as in algorithm~\ref{alg:defalt}. The inner and outer loop have therefore been switched and $a_{ij}=a_{ji}$ applied.
+
+\begin{algorithm}
+\caption{Defect Calculation for symmetric matrices $A$}
+\label{alg:defalt}
+\begin{algorithmic}[1]
+\State $d\gets b$
+\For {$i=0,\dots ,n$}
+  \For {$j=0,\dots ,n$}
+    \State $d_j\gets d_j-a_{ij}x_i$ \label{line:crux2}
+  \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{Gauss-Seidel Preconditioner}
+
+see Emans.
+
 \section{Jacobi Preconditioner}
 
 A Jacobi Preconditioner:
@@ -49,7 +68,7 @@ this is done algorithmically with
 \end{algorithmic}
 \end{algorithm}
 
-The challenge is to combine algorithms~\ref{alg:def} and \ref{alg:jac} into one algorithm with one outer loop over the matrix rows, to improve memory access. This is not possible without modification as the entries of the new $x$ needed in line~\ref{line:crux} are not yet available. However, you can switch inner and outer loop of algorithm~\ref{alg:def} and use symmetry of the matrix A to obtain $d_j\gets d_j-a_{ij}x_i$ instead. These algorithms may then be combined into algorithm~\ref{alg:jacnew}.
+The challenge is to combine the computation of defect and \ref{alg:jac} into one algorithm with one outer loop over the matrix rows, to improve memory access. This is not possible without modification as the entries of the new $x$ needed in line~\ref{line:crux} are not yet available. However, you can use algorithm~\ref{alg:defalt} instead. These algorithms may then be combined into algorithm~\ref{alg:jacnew}.
 \begin{algorithm}
 \caption{Jacobi Preconditioner with Simulataneous Defect Calculation}
 \label{alg:jacnew}
@@ -102,7 +121,57 @@ For further enhancements when doing multiple steps of Jacobi preconditioning the
     \EndIf
   \EndFor
 \EndIf
+\end{algorithmic}
+\end{algorithm}
 
+\section{ILU(n) Preconditioner}
+
+ILU(n) calculates a LU decomposition limited to a certain sparsity spattern. The computation of the decomposition is not subject to optimization here and the implementation from dune/istl/ilu.hh can be taken. The forward/backward substitution is though, algorithm~\ref{alg:ilu} reflects how the computation is done in above header. Note that the matrices $L$ and $U$ are stored within a single matrix and line~\ref{line:lii} implies $l_{ii}=1$.
+
+TODO das r im vorwaertseinsetzen ist eigentlich unnoetig, trotzdem schneller????
+
+\begin{algorithm}
+\caption{ILU(n) forward/backward substitution as in dune/istl/ilu.hh}
+\label{alg:ilu}
+\begin{algorithmic}
+\For {$i=0,\dots ,n-1$}
+  \State $r\gets b_i$
+  \For {$j<i$}
+    \State $r\gets r-l_{ij}x_j$
+  \EndFor
+  \State $x_i\gets r$ \label{line:lii}
+\EndFor
+\For {$i=n-1,\dots ,0$}
+  \State $r\gets x_i$
+  \For {$j>i$}
+    \State $r\gets r-u_{ij}x_j$
+  \EndFor
+  \State $x_i\gets r/u_{ii}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Once again symmetry on A is assumed to calculate the defect inside the last loop. The final result is algorithm~\ref{alg:ilunew}. A special treatment as previously seen is not needed here, as this preconditioner isnt applied iteratively and there is no savings from $x$ is being initialized to $0$.
+
+\begin{algorithm}
+\caption{ILU(n) forward/backward substitution with defect}
+\label{alg:ilunew}
+\begin{algorithmic}
+\For {$i=0,\dots ,n-1$}
+  \State $x_i\gets b_i$
+  \For {$j<i$}
+    \State $x_i\gets x_i-l_{ij}x_j$
+  \EndFor
+\EndFor
+\For {$i=n-1,\dots ,0$}
+  \For {$j>i$}
+    \State $x_i\gets x_i-u_{ij}x_j$
+  \EndFor
+  \State $x_i\gets x_i/u_{ii}$
+  \For {$j=0,\dots ,n$}
+    \State $d_j\gets d_j-a_{ij}x_i$
+  \EndFor
+\EndFor
 \end{algorithmic}
 \end{algorithm}
 \end{document}
