@@ -176,55 +176,58 @@ namespace Dune
         typedef typename M::ConstColIterator ColIterator;
         typedef typename Y::block_type YBlock;
 
-        typename Y::iterator dIter=d.begin();
         typename Y::const_iterator bIter=b.begin();
         typename X::iterator xIter=x.begin();
 
-        // a jacobi-intrinsic problem: we need the entire old x until the end of the computation
-        const X xold(x);
+        if (compDef)
+          d=b;
 
-        d=b;
-
-        for(RowIterator row=A.begin(), end=A.end(); row != end;
-            ++row, ++dIter, ++xIter, ++bIter)
+        if (first)
         {
-          YBlock r = *bIter;
-
-          ColIterator col = row->begin();
-          ColIterator colEnd = row->end();
-          for (; col.index() < row.index(); ++col)
-            col->mmv(xold[col.index()],r);
-
-          ColIterator diag = col;
-
-          for (++col; col != colEnd; ++col)
-            col->mmv(xold[col.index()],r);
-
-          //TODO recursion
-          diag->solve(*xIter,r);
-
-          if (compDef)
+          for(RowIterator row=A.begin(), end=A.end(); row != end;
+            ++row, ++bIter, ++xIter)
           {
-            //*dIter = *bIter;
-            col = row->begin();
-            for (; col != colEnd; ++col)
-              col->mmv(*xIter,d[col.index()]);
+            (*row)[row.index()].solve(*xIter,*bIter);
+            if (compDef)
+            {
+              ColIterator col = row->begin();
+              ColIterator colEnd = row->end();
+              for (; col != colEnd; ++col)
+                col->mmv(*xIter,d[col.index()]);
+            }
           }
         }
-        // precious debug code
-        if (compDef)
+        else
         {
-          Y newdef(b);
-          typename Y::iterator dit = newdef.begin();
-          typename X::iterator xit = x.begin();
-          for (RowIterator row = A.begin(); row != A.end(); ++row, ++xit, ++dit)
-            for(ColIterator col = row->begin(); col!=row->end(); ++col)
-              col->mmv(x[col.index()], *dit);
-          for (int i=0; i<newdef.size(); i++)
-            if (std::abs(newdef[i][0]-d[i][0])>1e-4)
-              DUNE_THROW(Dune::Exception,"Falschen Defekt berechnet");
-        }
+          // a jacobi-intrinsic problem: we need the entire old x until the end of the computation
+          const X xold(x);
 
+          for(RowIterator row=A.begin(), end=A.end(); row != end;
+            ++row, ++xIter, ++bIter)
+          {
+            YBlock r = *bIter;
+
+            ColIterator col = row->begin();
+            ColIterator colEnd = row->end();
+            for (; col.index() < row.index(); ++col)
+              col->mmv(xold[col.index()],r);
+
+            ColIterator diag = col;
+
+            for (++col; col != colEnd; ++col)
+              col->mmv(xold[col.index()],r);
+
+            //TODO recursion
+            diag->solve(*xIter,r);
+
+            if (compDef)
+            {
+              col = row->begin();
+              for (; col != colEnd; ++col)
+                col->mmv(*xIter,d[col.index()]);
+            }
+          }
+        }
       }
 
       template<typename M, typename X, typename Y>
@@ -234,7 +237,6 @@ namespace Dune
         typedef typename M::ConstColIterator ColIterator;
         typedef typename Y::block_type YBlock;
 
-        typename Y::iterator dIter=d.beforeEnd();
         typename X::iterator xIter=x.beforeEnd();
         typename Y::const_iterator bIter=b.beforeEnd();
 
@@ -242,7 +244,7 @@ namespace Dune
         const X xold(x);
 
         for(RowIterator row=A.beforeEnd(), end=A.beforeBegin(); row != end;
-            --row, --dIter, --xIter, --bIter)
+          --row, --xIter, --bIter)
         {
           YBlock r = *bIter;
           ColIterator endCol=(*row).beforeBegin();
@@ -257,7 +259,6 @@ namespace Dune
 
           diag->solve(*xIter,r);
         }
-
       }
     };
 
@@ -266,9 +267,15 @@ namespace Dune
       template<typename M, typename X, typename Y>
       static void apply(const M& A, X& x, Y& d, const Y& b, int num_iter)
       {
-        for (int i=0; i<num_iter-1; i++)
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,false);
-        JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
+        if (num_iter == 1)
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,true);
+        else
+        {
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,false);
+          for (int i=0; i<num_iter-2; i++)
+            JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,false);
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
+        }
       }
     };
 
