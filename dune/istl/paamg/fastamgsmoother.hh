@@ -169,8 +169,8 @@ namespace Dune
     template<std::size_t level>
     struct JacobiStepWithDefect
     {
-      template<typename M, typename X, typename Y>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
+      template<typename M, typename X, typename Y, typename K>
+      static void forward_apply(const M& A, X& x, Y& d, const Y& b, const K& w, bool first, bool compDef)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -193,7 +193,10 @@ namespace Dune
               ColIterator col = row->begin();
               ColIterator colEnd = row->end();
               for (; col != colEnd; ++col)
+              {
                 col->mmv(*xIter,d[col.index()]);
+                *xIter *= w;
+              }
             }
           }
         }
@@ -220,6 +223,10 @@ namespace Dune
             //TODO recursion
             diag->solve(*xIter,r);
 
+            //damping
+            *xIter *= 1-w;
+            xIter->axpy(w,xold[row.index()]);
+
             if (compDef)
             {
               col = row->begin();
@@ -227,11 +234,13 @@ namespace Dune
                 col->mmv(*xIter,d[col.index()]);
             }
           }
+          x *= w;
+          x.axpy(K(1)-w,xold);
         }
       }
 
-      template<typename M, typename X, typename Y>
-      static void backward_apply(const M& A, X& x, Y& d, const Y& b)
+      template<typename M, typename X, typename Y, typename K>
+      static void backward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -259,33 +268,35 @@ namespace Dune
 
           diag->solve(*xIter,r);
         }
+        x *= w;
+        x.axpy(K(1)-w,xold);
       }
     };
 
     struct JacobiPresmoothDefect
     {
-      template<typename M, typename X, typename Y>
-      static void apply(const M& A, X& x, Y& d, const Y& b, int num_iter)
+      template<typename M, typename X, typename Y, typename K>
+      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
       {
         if (num_iter == 1)
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,true);
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,true,true);
         else
         {
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,false);
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,true,false);
           for (int i=0; i<num_iter-2; i++)
-            JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,false);
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
+            JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,false,false);
+          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,false,true);
         }
       }
     };
 
     struct JacobiPostsmoothDefect
     {
-      template<typename M, typename X, typename Y>
-      static void apply(const M& A, X& x, Y& d, const Y& b, int num_iter)
+      template<typename M, typename X, typename Y, typename K>
+      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
       {
         for (int i=0; i<num_iter; i++)
-          JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
+          JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b,w);
       }
     };
 //TODO this cannot work. we need an object for ilu smoothing
