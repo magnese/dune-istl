@@ -9,6 +9,92 @@ namespace Dune
 {
   namespace Amg
   {
+    template<typename S>
+    struct SmootherCalculatesDefect
+    {
+      enum
+      {
+        /** true if given smoother has the interface and functionality
+         * to directly calculate the defects
+         */
+        value = false
+      };
+    };
+
+    // implements "concept-like" behaviour depending on the property value p
+    template<class S, bool p>
+    struct SmootherWithDefectHelper : public S
+    {
+      template<typename... A>
+      SmootherWithDefectHelper(A... args) : S(args...)
+      {}
+    };
+
+    template<class S>
+    struct SmootherWithDefectHelper<S,false> : public S
+    {
+      template<typename... A>
+      SmootherWithDefectHelper(A... args) : S(args...)
+      {}
+
+      template<typename M, typename X, typename Y>
+      void preApply(const M& A, X& x, Y& d, const Y& b)
+      {
+        // apply the preconditioner
+        this->apply(x,b);
+
+        //defect calculation
+        d = b;
+        typedef typename M::ConstRowIterator RowIterator;
+        typedef typename M::ConstColIterator ColIterator;
+        typename Y::const_iterator xIter = x.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++xIter)
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(*xIter,d[col.index()]);
+      }
+
+      template<typename M, typename X, typename Y>
+      void postApply(const M& A, X& x, Y& d, const Y& b)
+      {
+        this->apply(x,b);
+      }
+    };
+
+    /** @brief helper class to use normal smoothers with fastamg
+     * For smoothers that do defect calculation (those that have SmootherCalculatesDefect<S>::value==1)
+     * this class just mimics the smoother. For other smoothers, this adds methods preApply() and
+     * postApply() as expected by fastamg that will do the defect calculation.
+     */
+    template<class S>
+    struct SmootherWithDefect : public SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >
+    {
+      template<typename... A>
+      SmootherWithDefect(A... args) : SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >(args...)
+      {}
+    };
+
+    template<typename S>
+    struct ConstructionTraits<SmootherWithDefect<S> >
+    {
+      typedef typename ConstructionTraits<S>::Arguments Arguments;
+
+      static inline SmootherWithDefect<S>* construct(Arguments& args)
+      {
+        return static_cast<SmootherWithDefect<S>*>(ConstructionTraits<S>::construct(args));
+      }
+
+      static inline void deconstruct(S* prec)
+      {
+        ConstructionTraits<S>::deconstruct(prec);
+      }
+    };
+
+    template<typename S>
+    struct SmootherTraits<SmootherWithDefect<S> >
+    {
+      typedef typename SmootherTraits<S>::Arguments Arguments;
+    };
+
     template<int level>
     struct GaussSeidelStepWithDefect
     {
@@ -62,21 +148,6 @@ namespace Dune
               col->mmv(*xIter, d[col.index()]);     //d_j-=A_ij x_i
           }
         }
-        // precious debug code
-//         if (compDef)
-//         {
-//           Y newdef(b);
-//           typename Y::iterator dit = newdef.begin();
-//           typename X::iterator xit = x.begin();
-//           for (RowIterator row = A.begin(); row != A.end(); ++row, ++xit, ++dit)
-//             for(ColIterator col = row->begin(); col!=row->end(); ++col)
-//               col->mmv(x[col.index()], *dit);
-//               //col->mmv(*xit, d[col.index()]);
-//           for (int i=0; i<newdef.size(); i++)
-//            // std::cout << newdef[i] << " " << d[i] << std::endl;
-//             if (std::abs(newdef[i][0]-d[i][0])>1e-4)
-//               DUNE_THROW(Dune::Exception,"Falschen Defekt berechnet");
-//         }
       }
 
       template<typename M, typename X, typename Y>
@@ -131,15 +202,23 @@ namespace Dune
       }
     };
 
-
-    struct GaussSeidelPresmoothDefect
+    template<typename M, typename X, typename Y>
+    class GaussSeidelWithDefect
     {
-      template<typename M, typename X, typename Y>
-      static void apply(const M& A, X& x, Y& d,
-                        const Y& b, int num_iter)
+      public:
+      typedef M matrix_type;
+      GaussSeidelWithDefect(const M& A, int num_iter_) : A_(A),num_iter__(num_iter_)
+      {}
+
+      enum {
+        category = SolverCategory::sequential
+      };
+
+      void preApply(const M& A, X& x, Y& d, const Y& b)
       {
         // perform iterations. These have to know whether they are first
         // and whether to compute a defect.
+        int num_iter = 3;
         if (num_iter == 1)
           GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,true);
         else
@@ -150,22 +229,48 @@ namespace Dune
           GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
         }
       }
-    };
 
-    struct GaussSeidelPostsmoothDefect {
-
-      template<typename M, typename X, typename Y>
-      static void apply(const M& A, X& x, Y& d,
-                        const Y& b, int num_iter)
+      void postApply(const M& A, X& x, Y& d,
+                        const Y& b)
       {
+        int num_iter=3;
         for (int i=0; i<num_iter; i++)
           GaussSeidelStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
       }
+
+      private:
+      const M& A_;
+      int num_iter__;
+    };
+
+    template<typename M, typename X, typename Y>
+    struct ConstructionTraits<GaussSeidelWithDefect<M,X,Y> >
+    {
+      typedef DefaultConstructionArgs<GaussSeidelWithDefect<M,X,Y> > Arguments;
+
+      static inline GaussSeidelWithDefect<M,X,Y>* construct(Arguments& args)
+      {
+        return new GaussSeidelWithDefect<M,X,Y>(args.getMatrix(),args.getArgs().iterations);
+      }
+
+      static void deconstruct(GaussSeidelWithDefect<M,X,Y>* obj)
+      {
+        delete obj;
+      }
+    };
+
+    template<typename M,typename X,typename Y>
+    struct SmootherCalculatesDefect<GaussSeidelWithDefect<M,X,Y> >
+    {
+      enum {
+        value = true
+      };
     };
 
 
-    //! JACOBI SMOOTHING
 
+    //! JACOBI SMOOTHING
+//TODO adjust jacobi to the new style!
     template<std::size_t level>
     struct JacobiStepWithDefect
     {
