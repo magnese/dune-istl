@@ -4,6 +4,8 @@
 #ifndef DUNE_ISTL_FASTAMG_HH
 #define DUNE_ISTL_FASTAMG_HH
 
+#include "fastamgsmoother.hh"
+
 #include <memory>
 #include <dune/common/exceptions.hh>
 #include <dune/istl/paamg/smoother.hh>
@@ -18,7 +20,6 @@
 #include <dune/common/typetraits.hh>
 #include <dune/common/exceptions.hh>
 
-#include "fastamgsmoother.hh"
 
 /** @file
  * @author Markus Blatt
@@ -304,8 +305,8 @@ namespace Dune
       bool buildHierarchy_;
       bool symmetric;
       bool coarsesolverconverged;
+      //typedef Smoother CoarseSmoother;
       typedef SeqSSOR<typename M::matrix_type,X,X> CoarseSmoother;
-      //typedef Dune::shared_ptr<Smoother> SmootherPointer;
       Dune::shared_ptr<CoarseSmoother> coarseSmoother_;
       /** @brief The verbosity level. */
       std::size_t verbosity_;
@@ -357,10 +358,10 @@ namespace Dune
                                const SmootherArgs& smootherArgs,
                                bool symmetric_,
                                const PI& pinfo)
-      : solver_(), rhs_(), lhs_(), residual_(), scalarProduct_(), gamma_(parms.getGamma()),
+      : smootherArgs_(smootherArgs), smoothers_(new Hierarchy<Smoother,A>),solver_(),
+        rhs_(), lhs_(), residual_(), scalarProduct_(), gamma_(parms.getGamma()),
         preSteps_(parms.getNoPreSmoothSteps()), postSteps_(parms.getNoPostSmoothSteps()),
-        buildHierarchy_(true), smootherArgs_(smootherArgs), smoothers_(new Hierarchy<Smoother,A>),
-        symmetric(symmetric_), coarsesolverconverged(true),
+        buildHierarchy_(true), symmetric(symmetric_), coarsesolverconverged(true),
         coarseSmoother_(), verbosity_(criterion.debugLevel())
     {
       if(preSteps_>1||postSteps_>1)
@@ -405,12 +406,16 @@ namespace Dune
 
       matrices_->template build<NegateSet<typename PI::OwnerSet> >(criterion);
 
+       // build the necessary smoother hierarchies
+      matrices_->coarsenSmoother(*smoothers_, smootherArgs_);
+
       if(verbosity_>0 && matrices_->parallelInformation().finest()->communicator().rank()==0)
         std::cout<<"Building Hierarchy of "<<matrices_->maxlevels()<<" levels took "<<watch.elapsed()<<" seconds."<<std::endl;
 
       if(buildHierarchy_ && matrices_->levels()==matrices_->maxlevels()) {
         // We have the carsest level. Create the coarse Solver
-        SmootherArgs sargs;
+        //TODO hier gibt es ein prinzipielles problem, da wir zwei sorten von args haben
+        SmootherArgs sargs(smootherArgs_);
         sargs.iterations = 1; //TODO change this (or simply remove?)
 
         typename ConstructionTraits<CoarseSmoother>::Arguments cargs;
@@ -541,8 +546,8 @@ namespace Dune
     template<class M, class X, class S, class PI, class A>
     void FastAMG<M,X,S,PI,A>::apply(Domain& v, const Range& d)
     {
-      //TODO aenderungen nicht nachvollzogen
       LevelContext levelContext;
+
       // Init all iterators for the current level
       initIteratorsWithFineLevel(levelContext);
 
@@ -562,6 +567,7 @@ namespace Dune
     template<class M, class X, class S, class PI, class A>
     void FastAMG<M,X,S,PI,A>::initIteratorsWithFineLevel(LevelContext& levelContext)
     {
+      levelContext.smoother = smoothers_->finest();
       levelContext.matrix = matrices_->matrices().finest();
       levelContext.pinfo = matrices_->parallelInformation().finest();
       levelContext.redist =
@@ -611,6 +617,7 @@ namespace Dune
 
         if(levelContext.matrix != matrices_->matrices().coarsest() || matrices_->levels()<matrices_->maxlevels()) {
           // next level is not the globally coarsest one
+          ++levelContext.smoother;
           ++levelContext.aggregates;
         }
         // prepare the lhs on the next level
@@ -666,12 +673,10 @@ namespace Dune
     void FastAMG<M,X,S,PI,A>
     ::presmooth(LevelContext& levelContext, Domain& x, const Range& b)
     {
-      //double w = 0.75;
-
      // SmootherWithDefect<GaussSeidelWithDefect> smoother;
     //  SmootherWithDefect<SeqJac<typename M::matrix_type, Domain, Range> > smoother(levelContext.matrix->getmat(),1,1.0);
-      //TODO die matrix hat der preconditioner jetzt ja eigentlich schon bekommen
       levelContext.smoother->preApply(levelContext.matrix->getmat(),x, *levelContext.residual,b);
+      //levelContext.smoother->apply(x, b);
       //GaussSeidelWithDefect<typename M::matrix_type,X,X>::preApply(levelContext.matrix->getmat(),x, *levelContext.residual,b);
     }
 

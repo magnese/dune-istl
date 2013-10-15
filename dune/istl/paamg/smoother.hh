@@ -167,6 +167,26 @@ namespace Dune
     class ConstructionTraits;
 
     /**
+     * @brief Policy for the construction of the SeqGS smoother
+     */
+    template<class M, class X, class Y, int l>
+    struct ConstructionTraits<SeqGS<M,X,Y,l> >
+    {
+      typedef DefaultConstructionArgs<SeqGS<M,X,Y,l> > Arguments;
+
+      static inline SeqGS<M,X,Y,l>* construct(Arguments& args)
+      {
+        return new SeqGS<M,X,Y,l>(args.getMatrix(), args.getArgs().iterations,
+                                    args.getArgs().relaxationFactor);
+      }
+
+      static inline void deconstruct(SeqGS<M,X,Y,l>* ssor)
+      {
+        delete ssor;
+      }
+    };
+
+    /**
      * @brief Policy for the construction of the SeqSSOR smoother
      */
     template<class M, class X, class Y, int l>
