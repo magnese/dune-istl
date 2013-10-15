@@ -641,6 +641,7 @@ namespace Dune
       if(processNextLevel) {
         if(levelContext.matrix != matrices_->matrices().coarsest() || matrices_->levels()<matrices_->maxlevels()) {
           // previous level is not the globally coarsest one
+          --levelContext.smoother;
           --levelContext.aggregates;
         }
         --levelContext.redist;
@@ -682,7 +683,7 @@ namespace Dune
     {
      // SmootherWithDefect<GaussSeidelWithDefect> smoother;
     //  SmootherWithDefect<SeqJac<typename M::matrix_type, Domain, Range> > smoother(levelContext.matrix->getmat(),1,1.0);
-      levelContext.smoother->preApply(levelContext.matrix->getmat(),x, *levelContext.residual,b);
+      levelContext.smoother->preApply(x, *levelContext.residual,b);
       //levelContext.smoother->apply(x, b);
       //GaussSeidelWithDefect<typename M::matrix_type,X,X>::preApply(levelContext.matrix->getmat(),x, *levelContext.residual,b);
     }
@@ -694,7 +695,7 @@ namespace Dune
       //double w = 0.75;
       //SmootherWithDefect<GaussSeidelWithDefect> smoother;
       //SmootherWithDefect<SeqJac<typename M::matrix_type, Domain, Range> > smoother(levelContext.matrix->getmat(),1,1.0);
-      levelContext.smoother->postApply(levelContext.matrix->getmat(), x, *levelContext.residual, b);
+      levelContext.smoother->postApply(x, *levelContext.residual, b);
     }
 
 
