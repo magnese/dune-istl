@@ -31,24 +31,27 @@ namespace Dune
     template<class S>
     struct SmootherWithDefectHelper<S,false> : public S
     {
-      template<typename M, typename X, typename Y>
-      void preApply(const M& A, X& x, Y& d, const Y& b)
+      typedef typename S::matrix_type matrix_type;
+      typedef typename S::matrix_type Matrix;
+      typedef typename S::domain_type Domain;
+      typedef typename S::range_type Range;
+
+      void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
         this->apply(x,b);
 
         //defect calculation
         d = b;
-        typedef typename M::ConstRowIterator RowIterator;
-        typedef typename M::ConstColIterator ColIterator;
-        typename Y::const_iterator xIter = x.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++xIter)
+        typedef typename Matrix::ConstRowIterator RowIterator;
+        typedef typename Matrix::ConstColIterator ColIterator;
+        typename Range::const_iterator xIter = x.begin();
+        for(RowIterator row=this->_A_.begin(), end=this->_A_.end(); row != end; ++row, ++xIter)
           for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
             col->mmv(*xIter,d[col.index()]);
       }
 
-      template<typename M, typename X, typename Y>
-      void postApply(const M& A, X& x, Y& d, const Y& b)
+      void postApply(Domain& x, Range& d, const Range& b)
       {
         this->apply(x,b);
       }
@@ -113,7 +116,7 @@ namespace Dune
 
           // do upper triangular matrix only if not the first iteration
           // because x would be 0 anyway, store result in v for latter use
-          YBlock v = 0;
+          YBlock v = YBlock(0.0);
           if (!first)
           {
             //skip diagonal and iterate over the rest
@@ -197,19 +200,19 @@ namespace Dune
     {
       public:
       typedef M matrix_type;
-      GaussSeidelWithDefect(const M& A, int num_iter_) : A_(A),num_iter__(num_iter_)
+      typedef M Matrix;
+
+      GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
       {}
 
       enum {
         category = SolverCategory::sequential
       };
 
-      void preApply(const M& A, X& x, Y& d, const Y& b)
+      void preApply(X& x, Y& d, const Y& b)
       {
-        assert(d.size()==b.size());
         // perform iterations. These have to know whether they are first
         // and whether to compute a defect.
-        int num_iter = 3;
         if (num_iter == 1)
           GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,true);
         else
@@ -221,17 +224,16 @@ namespace Dune
         }
       }
 
-      void postApply(const M& A, X& x, Y& d,
+      void postApply(X& x, Y& d,
                         const Y& b)
       {
-        int num_iter=3;
         for (int i=0; i<num_iter; i++)
           GaussSeidelStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
       }
 
       private:
-      const M& A_;
-      int num_iter__;
+      const M& A;
+      int num_iter;
     };
 
     template<typename M, typename X, typename Y>
