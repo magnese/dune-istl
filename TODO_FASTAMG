@@ -1,0 +1,17 @@
+BUGFIXES
+- make old preconditioners wrapping work
+- write the pre- and postprocessor for smoothers in fastamg (not a bug with all current preconditioners)
+- remove -Wreorder warnings by ordering the args in fastamg
+
+FEATURES
+- correctly give the smoother parameters to the new classes
+- implement ILU(n)
+- switch Jacobi implementation to new interface
+- export corresponding "normal" smoother to use as coarsesmoother
+
+DOCUMENTATION
+
+GENERAL
+- code cleanup
+- remove the matrix from the PWD-interface as its known to the preconditioner
+- measure time diff between fastamg and amg with non-specialized preconditioners.

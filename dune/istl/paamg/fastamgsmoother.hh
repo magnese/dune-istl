@@ -5,6 +5,8 @@
 
 #include <cstddef>
 
+#include "smoother.hh"
+
 namespace Dune
 {
   namespace Amg
@@ -21,22 +23,14 @@ namespace Dune
       };
     };
 
-    // implements "concept-like" behaviour depending on the property value p
+    // implements "category-like" behaviour depending on the property value p
     template<class S, bool p>
     struct SmootherWithDefectHelper : public S
-    {
-      template<typename... A>
-      SmootherWithDefectHelper(A... args) : S(args...)
-      {}
-    };
+    {};
 
     template<class S>
     struct SmootherWithDefectHelper<S,false> : public S
     {
-      template<typename... A>
-      SmootherWithDefectHelper(A... args) : S(args...)
-      {}
-
       template<typename M, typename X, typename Y>
       void preApply(const M& A, X& x, Y& d, const Y& b)
       {
@@ -67,11 +61,7 @@ namespace Dune
      */
     template<class S>
     struct SmootherWithDefect : public SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >
-    {
-      template<typename... A>
-      SmootherWithDefect(A... args) : SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >(args...)
-      {}
-    };
+    {};
 
     template<typename S>
     struct ConstructionTraits<SmootherWithDefect<S> >
@@ -216,6 +206,7 @@ namespace Dune
 
       void preApply(const M& A, X& x, Y& d, const Y& b)
       {
+        assert(d.size()==b.size());
         // perform iterations. These have to know whether they are first
         // and whether to compute a defect.
         int num_iter = 3;
