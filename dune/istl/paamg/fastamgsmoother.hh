@@ -34,8 +34,7 @@ namespace Dune
 
       typedef typename S::RecommendedCoarseSmoother RecommendedCoarseSmoother;
 
-      SmootherWithDefectHelper(const Matrix&,
-                               typename ConstructionTraits<S>::Arguments& args)
+      SmootherWithDefectHelper(typename ConstructionTraits<S>::Arguments& args)
       {
         smoother = ConstructionTraits<S>::construct(args);
       }
@@ -70,9 +69,8 @@ namespace Dune
       typedef typename S::range_type Range;
       typedef S RecommendedCoarseSmoother;
 
-      SmootherWithDefectHelper(const Matrix& A_,
-                               typename ConstructionTraits<S>::Arguments& args)
-        : A(A_)
+      SmootherWithDefectHelper(typename ConstructionTraits<S>::Arguments& args)
+        : A(args.getMatrix())
       {
         smoother = ConstructionTraits<S>::construct(args);
       }
@@ -81,15 +79,6 @@ namespace Dune
       {
         ConstructionTraits<S>::deconstruct(smoother);
       }
-
-//       // if the base class has an apply method with direction, that one should be
-//       // called, otherwise this method calls the normal apply for both directions.
-//       template<bool forward>
-//       void apply(Domain& x, const Range& b)
-//       {
-//         std::cout << "SWDH::apply called " << std::endl;
-//         S::apply(x,b);
-//       }
 
       void preApply(Domain& x, Range& d, const Range& b)
       {
@@ -132,7 +121,7 @@ namespace Dune
 
       static inline SmootherWithDefect<S>* construct(Arguments& args)
       {
-        return static_cast<SmootherWithDefect<S>*>(new SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>(args.getMatrix(),args));
+        return static_cast<SmootherWithDefect<S>*>(new SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>(args));
       }
 
       static inline void deconstruct(SmootherWithDefect<S>* obj)
