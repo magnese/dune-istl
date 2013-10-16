@@ -4,9 +4,7 @@ BUGFIXES
 - remove -Wreorder warnings by ordering the args in fastamg
 
 FEATURES
-- correctly give the smoother parameters to the new classes
 - finish implementing ILU(n)
-- export corresponding "normal" smoother to use as coarsesmoother
 
 DOCUMENTATION
 - decide on a what-doxy-policy (and apply)
