@@ -23,7 +23,6 @@ namespace Dune
       };
     };
 
-    // implements "category-like" behaviour depending on the property value p
     template<class S, bool p>
     class SmootherWithDefectHelper
     {
@@ -95,7 +94,7 @@ namespace Dune
       void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
-        smoother->apply(x,b);
+        SmootherApplier<S>::preSmooth(*smoother,x,b);
 
         //defect calculation
         d = b;
@@ -109,7 +108,7 @@ namespace Dune
 
       void postApply(Domain& x, Range& d, const Range& b)
       {
-        smoother->apply(x,b);
+        SmootherApplier<S>::postSmooth(*smoother,x,b);
       }
 
       private:
