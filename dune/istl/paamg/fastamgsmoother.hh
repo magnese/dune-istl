@@ -25,16 +25,60 @@ namespace Dune
 
     // implements "category-like" behaviour depending on the property value p
     template<class S, bool p>
-    struct SmootherWithDefectHelper : public S
-    {};
-
-    template<class S>
-    struct SmootherWithDefectHelper<S,false> : public S
+    class SmootherWithDefectHelper
     {
+      public:
       typedef typename S::matrix_type matrix_type;
       typedef typename S::matrix_type Matrix;
       typedef typename S::domain_type Domain;
       typedef typename S::range_type Range;
+
+      SmootherWithDefectHelper(const Matrix&,
+                               typename ConstructionTraits<S>::Arguments& args)
+      {
+        smoother = ConstructionTraits<S>::construct(args);
+      }
+
+      ~SmootherWithDefectHelper()
+      {
+        ConstructionTraits<S>::deconstruct(smoother);
+      }
+
+       void preApply(Domain& x, Range& d, const Range& b)
+      {
+        // apply the preconditioner
+        smoother->preApply(x,d,b);
+      }
+
+      void postApply(Domain& x, Range& d, const Range& b)
+      {
+        smoother->postApply(x,d,b);
+      }
+
+      private:
+      S* smoother;
+    };
+
+    template<class S>
+    class SmootherWithDefectHelper<S,false>
+    {
+      public:
+      typedef typename S::matrix_type matrix_type;
+      typedef typename S::matrix_type Matrix;
+      typedef typename S::domain_type Domain;
+      typedef typename S::range_type Range;
+
+      SmootherWithDefectHelper(const Matrix& A_,
+                               typename ConstructionTraits<S>::Arguments& args)
+        : A(A_)
+      {
+        smoother = ConstructionTraits<S>::construct(args);
+      }
+
+      ~SmootherWithDefectHelper()
+      {
+        ConstructionTraits<S>::deconstruct(smoother);
+      }
 
 //       // if the base class has an apply method with direction, that one should be
 //       // called, otherwise this method calls the normal apply for both directions.
@@ -48,22 +92,26 @@ namespace Dune
       void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
-        this->apply(x,b);
+        smoother->apply(x,b);
 
         //defect calculation
         d = b;
         typedef typename Matrix::ConstRowIterator RowIterator;
         typedef typename Matrix::ConstColIterator ColIterator;
         typename Range::const_iterator xIter = x.begin();
-        for(RowIterator row=this->_A_.begin(), end=this->_A_.end(); row != end; ++row, ++xIter)
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++xIter)
           for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
             col->mmv(*xIter,d[col.index()]);
       }
 
       void postApply(Domain& x, Range& d, const Range& b)
       {
-        this->apply(x,b);
+        smoother->apply(x,b);
       }
+
+      private:
+      const Matrix& A;
+      S* smoother;
     };
 
     /** @brief helper class to use normal smoothers with fastamg
@@ -82,12 +130,12 @@ namespace Dune
 
       static inline SmootherWithDefect<S>* construct(Arguments& args)
       {
-        return static_cast<SmootherWithDefect<S>*>(ConstructionTraits<S>::construct(args));
+        return static_cast<SmootherWithDefect<S>*>(new SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>(args.getMatrix(),args));
       }
 
-      static inline void deconstruct(S* prec)
+      static inline void deconstruct(SmootherWithDefect<S>* obj)
       {
-        ConstructionTraits<S>::deconstruct(prec);
+        delete obj;
       }
     };
 
@@ -210,6 +258,12 @@ namespace Dune
       public:
       typedef M matrix_type;
       typedef M Matrix;
+      typedef typename X::field_type field_type;
+      typedef typename X::field_type Field;
+      typedef X domain_type;
+      typedef X Domain;
+      typedef Y range_type;
+      typedef Y Range;
 
       GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
       {}
@@ -394,6 +448,10 @@ namespace Dune
       typedef M Matrix;
       typedef typename M::field_type field_type;
       typedef typename M::field_type Field;
+      typedef X domain_type;
+      typedef X Domain;
+      typedef Y range_type;
+      typedef Y Range;
 
       JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
       {}
@@ -466,6 +524,10 @@ namespace Dune
       typedef M Matrix;
       typedef typename X::field_type field_type;
       typedef typename X::field_type Field;
+      typedef X domain_type;
+      typedef X Domain;
+      typedef Y range_type;
+      typedef Y Range;
 
       enum {
         category = SolverCategory::sequential
