@@ -465,13 +465,13 @@ namespace Dune
       typedef typename Smoother::range_type Range;
       typedef typename Smoother::domain_type Domain;
 
-      static void preSmooth(Smoother& smoother, Domain& v, Range& d)
+      static void preSmooth(Smoother& smoother, Domain& v, const Range& d)
       {
         smoother.template apply<true>(v,d);
       }
 
 
-      static void postSmooth(Smoother& smoother, Domain& v, Range& d)
+      static void postSmooth(Smoother& smoother, Domain& v, const Range& d)
       {
         smoother.template apply<false>(v,d);
       }
