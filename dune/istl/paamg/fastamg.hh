@@ -305,8 +305,7 @@ namespace Dune
       bool buildHierarchy_;
       bool symmetric;
       bool coarsesolverconverged;
-      //typedef Smoother CoarseSmoother;
-      typedef SeqSSOR<typename M::matrix_type,X,X> CoarseSmoother;
+      typedef typename Smoother::RecommendedCoarseSmoother CoarseSmoother;
       Dune::shared_ptr<CoarseSmoother> coarseSmoother_;
       /** @brief The verbosity level. */
       std::size_t verbosity_;

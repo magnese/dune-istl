@@ -33,6 +33,8 @@ namespace Dune
       typedef typename S::domain_type Domain;
       typedef typename S::range_type Range;
 
+      typedef typename S::RecommendedCoarseSmoother RecommendedCoarseSmoother;
+
       SmootherWithDefectHelper(const Matrix&,
                                typename ConstructionTraits<S>::Arguments& args)
       {
@@ -67,6 +69,7 @@ namespace Dune
       typedef typename S::matrix_type Matrix;
       typedef typename S::domain_type Domain;
       typedef typename S::range_type Range;
+      typedef S RecommendedCoarseSmoother;
 
       SmootherWithDefectHelper(const Matrix& A_,
                                typename ConstructionTraits<S>::Arguments& args)
@@ -265,6 +268,8 @@ namespace Dune
       typedef Y range_type;
       typedef Y Range;
 
+      typedef typename Dune::SeqGS<M,X,Y> RecommendedCoarseSmoother;
+
       GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
       {}
 
@@ -453,6 +458,8 @@ namespace Dune
       typedef Y range_type;
       typedef Y Range;
 
+      typedef typename Dune::SeqJac<M,X,Y> RecommendedCoarseSmoother;
+
       JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
       {}
 
@@ -517,7 +524,7 @@ namespace Dune
     };
 
     template<typename M, typename X, typename Y>
-    class ILUWithDefect
+    class ILUnWithDefect
     {
       public:
       typedef M matrix_type;
@@ -529,12 +536,14 @@ namespace Dune
       typedef Y range_type;
       typedef Y Range;
 
+      typedef typename Dune::SeqILUn<M,X,Y> RecommendedCoarseSmoother;
+
       enum {
         category = SolverCategory::sequential
       };
 
 
-      ILUWithDefect(const M& A_, int n, Field w_) : A(A_), decomp(A.N(), A.M(),M::row_wise), w(w_)
+      ILUnWithDefect(const M& A_, int n, Field w_) : A(A_), decomp(A.N(), A.M(),M::row_wise), w(w_)
       {
         if (n==0)
         {
@@ -594,29 +603,29 @@ namespace Dune
     };
 
     template<typename M, typename X, typename Y>
-    struct ConstructionTraits<ILUWithDefect<M,X,Y> >
+    struct ConstructionTraits<ILUnWithDefect<M,X,Y> >
     {
       typedef ConstructionArgs<SeqILUn<M,X,Y> > Arguments;
 
-      static inline ILUWithDefect<M,X,Y>* construct(Arguments& args)
+      static inline ILUnWithDefect<M,X,Y>* construct(Arguments& args)
       {
-        return new ILUWithDefect<M,X,Y>(args.getMatrix(), args.getN(), args.getArgs().relaxationFactor);
+        return new ILUnWithDefect<M,X,Y>(args.getMatrix(), args.getN(), args.getArgs().relaxationFactor);
       }
 
-      static void deconstruct(ILUWithDefect<M,X,Y>* obj)
+      static void deconstruct(ILUnWithDefect<M,X,Y>* obj)
       {
         delete obj;
       }
     };
 
     template<typename M, typename X, typename Y>
-    struct SmootherTraits<ILUWithDefect<M,X,Y> >
+    struct SmootherTraits<ILUnWithDefect<M,X,Y> >
     {
       typedef DefaultSmootherArgs<typename M::field_type> Arguments;
     };
 
     template<typename M, typename X, typename Y>
-    struct SmootherCalculatesDefect<ILUWithDefect<M,X,Y> >
+    struct SmootherCalculatesDefect<ILUnWithDefect<M,X,Y> >
     {
       enum {
         value = true
