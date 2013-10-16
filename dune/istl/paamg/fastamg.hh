@@ -313,8 +313,8 @@ namespace Dune
 
     template<class M, class X, class S, class PI, class A>
     FastAMG<M,X,S,PI,A>::FastAMG(const FastAMG& amg)
-    : matrices_(amg.matrices_), solver_(amg.solver_), smootherArgs_(amg.smootherArgs),
-      smoothers_(amg.smoothers_),
+    : matrices_(amg.matrices_), smootherArgs_(amg.smootherArgs),
+      smoothers_(amg.smoothers_), solver_(amg.solver_),
       rhs_(), lhs_(), residual_(), scalarProduct_(amg.scalarProduct_),
       gamma_(amg.gamma_), preSteps_(amg.preSteps_), postSteps_(amg.postSteps_),
       symmetric(amg.symmetric), coarsesolverconverged(amg.coarsesolverconverged),
@@ -331,8 +331,8 @@ namespace Dune
     template<class M, class X, class S, class PI, class A>
     FastAMG<M,X,S,PI,A>::FastAMG(const OperatorHierarchy& matrices, CoarseSolver& coarseSolver,
                                const Parameters& parms, const SmootherArgs& smootherArgs, bool symmetric_)
-      : matrices_(&matrices), solver_(&coarseSolver), smootherArgs_(smootherArgs),
-        smoothers_(new Hierarchy<Smoother,A>),
+      : matrices_(&matrices), smootherArgs_(smootherArgs),
+        smoothers_(new Hierarchy<Smoother,A>), solver_(&coarseSolver),
         rhs_(), lhs_(), residual_(), scalarProduct_(),
         gamma_(parms.getGamma()), preSteps_(parms.getNoPreSmoothSteps()),
         postSteps_(parms.getNoPostSmoothSteps()), buildHierarchy_(false),
@@ -357,7 +357,7 @@ namespace Dune
                                const SmootherArgs& smootherArgs,
                                bool symmetric_,
                                const PI& pinfo)
-      : smootherArgs_(smootherArgs), smoothers_(new Hierarchy<Smoother,A>),solver_(),
+      : smootherArgs_(smootherArgs), smoothers_(new Hierarchy<Smoother,A>), solver_(),
         rhs_(), lhs_(), residual_(), scalarProduct_(), gamma_(parms.getGamma()),
         preSteps_(parms.getNoPreSmoothSteps()), postSteps_(parms.getNoPostSmoothSteps()),
         buildHierarchy_(true), symmetric(symmetric_), coarsesolverconverged(true),
