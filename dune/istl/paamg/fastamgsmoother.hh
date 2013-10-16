@@ -11,18 +11,32 @@ namespace Dune
 {
   namespace Amg
   {
+    /** @file
+     *  @brief Defines special smoothers that are able to calculate defects
+     *
+     * A new interface to be used with FastAMG is introduced. A compatibility
+     * class SmootherWithDefect<S> allows to construct a smoother from a smoother
+     * implementing the preconditioner interface. Special smoothers are implemented
+     * based on observations how the defect can be calculated during smoothing in
+     * the case of symmetric matrices. This results in time savings due to they
+     * reduced memory access.
+     */
+
     template<typename S>
     struct SmootherCalculatesDefect
     {
       enum
       {
-        /** true if given smoother has the interface and functionality
+        /** @brief whether smoother calculates defects
+         *
+         * true if given smoother has the interface and functionality
          * to directly calculate the defects
          */
         value = false
       };
     };
 
+    //! implementation for smoothers that calculate defects
     template<class S, bool p>
     class SmootherWithDefectHelper
     {
@@ -59,6 +73,7 @@ namespace Dune
       S* smoother;
     };
 
+    //! implementation for smoothers that dont calculate defects
     template<class S>
     class SmootherWithDefectHelper<S,false>
     {
@@ -106,14 +121,17 @@ namespace Dune
     };
 
     /** @brief helper class to use normal smoothers with fastamg
-     * For smoothers that do defect calculation (those that have SmootherCalculatesDefect<S>::value==1)
-     * this class just mimics the smoother. For other smoothers, this adds methods preApply() and
-     * postApply() as expected by fastamg that will do the defect calculation.
+     * Wrapper class around the smoother (S), that fulfills the interface required from
+     * FastAMG for a smoother. If S itself fulfills this interface, no functionality is
+     * added. If not, the calls are forwarded to the preconditioner interface and generic
+     * defect calculation is added.
      */
     template<class S>
     struct SmootherWithDefect : public SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >
     {};
 
+    //! traits specialization: a wrapped smoother is constructed by taking the arguments
+    //! of the normal smoother and forwarding them in the constructor
     template<typename S>
     struct ConstructionTraits<SmootherWithDefect<S> >
     {
@@ -130,12 +148,15 @@ namespace Dune
       }
     };
 
+    //! traits specialization: the wrapped smoother has the same traits as the smoother
     template<typename S>
     struct SmootherTraits<SmootherWithDefect<S> >
     {
       typedef typename SmootherTraits<S>::Arguments Arguments;
     };
 
+    //! helper struct to implement one step of symmetric Gauss Seidel
+    //TODO implement block recursion
     template<int level>
     struct GaussSeidelStepWithDefect
     {
@@ -174,8 +195,6 @@ namespace Dune
           }
           *dIter -= v;
 
-          // TODO either go on the next blocklevel recursively or just solve with diagonal (TMP)
-          //GaussSeidelStepWithDefect<level-1>::forward_apply(*diag,*xIter,*dIter,*bIter,first,compDef);
           diag->solve(*xIter,*dIter);
 
           // compute defect if necessary
@@ -219,30 +238,36 @@ namespace Dune
           for (--col; col!=endCol; --col)
             (*col).mmv(x[col.index()],*dIter);     // d -= sum_{j<i} a_ij * xold_j
 
-          // TODO Not recursive yet. Just solve with the diagonal
           diag->solve(*xIter,*dIter);
         }
       }
     };
 
+    //! specialization for blocklevel 0
+    //TODO this is non-functioning
     template<>
     struct GaussSeidelStepWithDefect<0>
     {
       template<typename M, typename X, typename Y>
       static void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
       {
-        //TODO to reproduce the optimized forward version, this needs to be d, but is this generally okay???
         A.solve(x,d);
       }
 
       template<typename M, typename X, typename Y>
       static void backward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
       {
-        //TODO to reproduce the optimized forward version, this needs to be d, but is this generally okay???
         A.solve(x,d);
       }
     };
 
+    /** @brief a symmetric Gauss-Seidel smoother that does compute defects
+     * @tparam M the matrix type
+     * @tparam X the domain type
+     * @tparam Y the range type
+     * fulfills the interface required by FastAMG. Options may be passed via the
+     * DefaultSmootherArgs factory concept.
+     */
     template<typename M, typename X, typename Y>
     class GaussSeidelWithDefect
     {
@@ -256,15 +281,28 @@ namespace Dune
       typedef Y range_type;
       typedef Y Range;
 
+      //! the type of coarse grid smoother that fits this smoother in AMG
       typedef typename Dune::SeqGS<M,X,Y> RecommendedCoarseSmoother;
 
+      /** @brief construct a symetric Gauss-Seidel smoother that computes defects
+       * @param A_ the matrix them smoother operates on
+       * @param num_iter_ the number of iterations done by the smoother
+       * TODO do we want relaxation here?
+       * These parameters may be provided via the ConstructionTraits class!
+       */
       GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
       {}
 
       enum {
+        /** @brief The solver category */
         category = SolverCategory::sequential
       };
 
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void preApply(X& x, Y& d, const Y& b)
       {
         // perform iterations. These have to know whether they are first
@@ -280,6 +318,11 @@ namespace Dune
         }
       }
 
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void postApply(X& x, Y& d,
                         const Y& b)
       {
@@ -292,6 +335,7 @@ namespace Dune
       int num_iter;
     };
 
+    //! traits specialization: wrap the GaussSeidelWithDefect constructor
     template<typename M, typename X, typename Y>
     struct ConstructionTraits<GaussSeidelWithDefect<M,X,Y> >
     {
@@ -308,12 +352,14 @@ namespace Dune
       }
     };
 
+    //! traits specialization: GaussSeidelWithDefect takes no special arguments
     template<typename M,typename X,typename Y>
     struct SmootherTraits<GaussSeidelWithDefect<M,X,Y> >
     {
       typedef DefaultSmootherArgs<typename M::field_type> Arguments;
     };
 
+    //! GaussSeidelWithDefect does compute defects!
     template<typename M,typename X,typename Y>
     struct SmootherCalculatesDefect<GaussSeidelWithDefect<M,X,Y> >
     {
@@ -322,10 +368,9 @@ namespace Dune
       };
     };
 
-
-
-    //! JACOBI SMOOTHING
-//TODO adjust jacobi to the new style!
+    //! helper struct to implement one step of symmetric Jacobi iteration
+    //TODO implement block recursion
+    //TODO check back to damping and compare to gsetc.hh
     template<std::size_t level>
     struct JacobiStepWithDefect
     {
@@ -380,7 +425,6 @@ namespace Dune
             for (++col; col != colEnd; ++col)
               col->mmv(xold[col.index()],r);
 
-            //TODO recursion
             diag->solve(*xIter,r);
 
             //damping
@@ -433,6 +477,13 @@ namespace Dune
       }
     };
 
+    /** @brief a symmetric Jacobi smoother that does compute defects
+     * @tparam M the matrix type
+     * @tparam X the domain type
+     * @tparam Y the range type
+     * fulfills the interface required by FastAMG. Options may be passed via the
+     * DefaultSmootherArgs factory concept.
+     */
     template<typename M, typename X, typename Y>
     class JacobiWithDefect
     {
@@ -446,16 +497,28 @@ namespace Dune
       typedef Y range_type;
       typedef Y Range;
 
+      //! the type of coarse grid smoother that fits this smoother in AMG
       typedef typename Dune::SeqJac<M,X,Y> RecommendedCoarseSmoother;
 
+      /** @brief construct a symmetric Jacobi smoother that computes defects
+       * @param A_ the matrix the smoother operates on
+       * @param num_iter_ the number of iterations done by the smoother
+       * @param w_ the relaxation factor
+       * These parameters may be provided via the ConstructionTraits class!
+       */
       JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
       {}
 
       enum {
+        /** @brief The solver category */
         category = SolverCategory::sequential
       };
 
-
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void preApply(X& x, Y& d, const Y& b)
       {
         if (num_iter == 1)
@@ -469,6 +532,11 @@ namespace Dune
         }
       }
 
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void postApply(X& x, Y& d, const Y& b)
       {
         for (int i=0; i<num_iter; i++)
@@ -481,6 +549,7 @@ namespace Dune
       Field w;
     };
 
+    //! traits specialization: wrap the JacobiWithDefect constructor
     template<typename M, typename X, typename Y>
     struct ConstructionTraits<JacobiWithDefect<M,X,Y> >
     {
@@ -497,12 +566,14 @@ namespace Dune
       }
     };
 
+    //! traits specialization: JacobiWithDefect takes no special arguments
     template<typename M,typename X,typename Y>
     struct SmootherTraits<JacobiWithDefect<M,X,Y> >
     {
       typedef DefaultSmootherArgs<typename M::field_type> Arguments;
     };
 
+    //! JacobiWithDefect does compute defects!
     template<typename M,typename X,typename Y>
     struct SmootherCalculatesDefect<JacobiWithDefect<M,X,Y> >
     {
@@ -531,8 +602,10 @@ namespace Dune
       };
 
 
-      ILUnWithDefect(const M& A_, int n, Field w_) : A(A_), decomp(A.N(), A.M(),M::row_wise), w(w_)
+      ILUnWithDefect(const M& A_, int n, Field w_)
+        : A(A_), decomp(A.N(), A.M(),M::row_wise), w(w_)
       {
+        std::cout << "ILUn wiht n= " << n << std::endl;
         if (n==0)
         {
           decomp = A;
