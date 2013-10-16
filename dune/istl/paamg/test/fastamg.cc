@@ -6,6 +6,7 @@
 #include <dune/common/timer.hh>
 #include <dune/common/parallel/indexset.hh>
 #include <dune/common/parallel/collectivecommunication.hh>
+#include <dune/istl/overlappingschwarz.hh>
 #include <dune/istl/paamg/fastamg.hh>
 #include <dune/istl/paamg/pinfo.hh>
 #include <dune/istl/solvers.hh>
@@ -80,17 +81,27 @@ void testAMG(int N, int coarsenTarget, int ml)
 
   Dune::SeqScalarProduct<Vector> sp;
 
+//   // smoothers reusulting in a symmetric AMG work like a charm and are 10% faster even when not optimized
+//   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::SymmetricMultiplicativeSchwarzMode> Smoother;
+//   typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   // the optimized ones also work (set relaxationFactor to 0.5 or so for Jacobi)
 //   typedef Dune::Amg::GaussSeidelWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
-  //typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
-  //typedef Dune::Amg::ILUWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
-  typedef Dune::SeqILU0<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::Amg::JacobiWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
+//
+//   // non-symmetric ones just dont work (in neither case)
+//   typedef Dune::SeqILU0<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqILUn<BCRSMat,Vector,Vector> Smoother;
+//   typedef Dune::Amg::ILUnWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
 
   typedef Dune::Amg::FastAMG<Operator,Vector, Smoother> AMG;
   Dune::Amg::Parameters parms;
 
   typedef typename Dune::Amg::SmootherTraits<Smoother>::Arguments SmootherArgs;
   SmootherArgs smootherArgs;
-  smootherArgs.iterations = 3;
+  smootherArgs.iterations = 1;
+  smootherArgs.relaxationFactor = 1.0;
 
   AMG amg(fop, criterion, parms,smootherArgs);
 
@@ -123,8 +134,8 @@ void testAMG(int N, int coarsenTarget, int ml)
 int main(int argc, char** argv)
 {
 
-  int N=100;
-  int coarsenTarget=120;
+  int N=1000;
+  int coarsenTarget=1200;
   int ml=10;
 
   if(argc>1)
@@ -136,7 +147,7 @@ int main(int argc, char** argv)
   if(argc>3)
     ml = atoi(argv[3]);
 
-  //testAMG<1>(N, coarsenTarget, ml);
-  testAMG<2>(N, coarsenTarget, ml);
+  testAMG<1>(N, coarsenTarget, ml);
+  //testAMG<4>(N, coarsenTarget, ml);
 
 }

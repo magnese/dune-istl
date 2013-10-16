@@ -101,12 +101,14 @@ void testAMG(int N, int coarsenTarget, int ml)
 
   typedef Dune::Amg::CoarsenCriterion<Dune::Amg::UnSymmetricCriterion<BCRSMat,Dune::Amg::FirstDiagonal> >
   Criterion;
-  typedef Dune::SeqSSOR<BCRSMat,Vector,Vector> Smoother;
-  //typedef Dune::SeqSOR<BCRSMat,Vector,Vector> Smoother;
-  //typedef Dune::SeqJac<BCRSMat,Vector,Vector> Smoother;
-  //typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::MultiplicativeSchwarzMode> Smoother;
-  //typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::SymmetricMultiplicativeSchwarzMode> Smoother;
-  //typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector> Smoother;
+
+//   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::SymmetricMultiplicativeSchwarzMode> Smoother;
+//   typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqILU0<typename Operator::matrix_type, Vector, Vector> Smoother;
+//   typedef Dune::SeqILUn<BCRSMat,Vector,Vector> Smoother; //default: n=1
+
   typedef typename Dune::Amg::SmootherTraits<Smoother>::Arguments SmootherArgs;
 
   SmootherArgs smootherArgs;
@@ -129,7 +131,7 @@ void testAMG(int N, int coarsenTarget, int ml)
   Dune::SeqScalarProduct<Vector> sp;
   typedef Dune::Amg::AMG<Operator,Vector,Smoother> AMG;
 
-  Smoother smoother(mat,1,1);
+ // Smoother smoother(mat,1,1);
 
   AMG amg(fop, criterion, smootherArgs, 1, 1, 1, false);
 
@@ -163,7 +165,7 @@ void testAMG(int N, int coarsenTarget, int ml)
 int main(int argc, char** argv)
 {
 
-  int N=100;
+  int N=1000;
   int coarsenTarget=1200;
   int ml=10;
 
@@ -177,6 +179,6 @@ int main(int argc, char** argv)
     ml = atoi(argv[3]);
 
   testAMG<1>(N, coarsenTarget, ml);
-  testAMG<2>(N, coarsenTarget, ml);
+//   testAMG<4>(N, coarsenTarget, ml);
 
 }
