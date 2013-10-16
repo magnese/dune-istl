@@ -1,10 +1,10 @@
 BUGFIXES
 - make old preconditioners wrapping work (really, like tested) 
 - write the pre- and postprocessor for smoothers in fastamg (not a bug with all current preconditioners)
-- remove -Wreorder warnings by ordering the args in fastamg
 
 FEATURES
 - finish implementing ILU(n)
+- get access to directional apply methods in old preconditioners
 
 DOCUMENTATION
 - decide on a what-doxy-policy (and apply)
