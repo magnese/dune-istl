@@ -36,6 +36,15 @@ namespace Dune
       typedef typename S::domain_type Domain;
       typedef typename S::range_type Range;
 
+//       // if the base class has an apply method with direction, that one should be
+//       // called, otherwise this method calls the normal apply for both directions.
+//       template<bool forward>
+//       void apply(Domain& x, const Range& b)
+//       {
+//         std::cout << "SWDH::apply called " << std::endl;
+//         S::apply(x,b);
+//       }
+
       void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
@@ -116,7 +125,7 @@ namespace Dune
 
           // do upper triangular matrix only if not the first iteration
           // because x would be 0 anyway, store result in v for latter use
-          YBlock v = YBlock(0.0);
+          YBlock v(0.0);
           if (!first)
           {
             //skip diagonal and iterate over the rest
@@ -253,6 +262,12 @@ namespace Dune
     };
 
     template<typename M,typename X,typename Y>
+    struct SmootherTraits<GaussSeidelWithDefect<M,X,Y> >
+    {
+      typedef DefaultSmootherArgs<typename M::field_type> Arguments;
+    };
+
+    template<typename M,typename X,typename Y>
     struct SmootherCalculatesDefect<GaussSeidelWithDefect<M,X,Y> >
     {
       enum {
@@ -371,10 +386,24 @@ namespace Dune
       }
     };
 
-    struct JacobiPresmoothDefect
+    template<typename M, typename X, typename Y>
+    class JacobiWithDefect
     {
-      template<typename M, typename X, typename Y, typename K>
-      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef typename M::field_type field_type;
+      typedef typename M::field_type Field;
+
+      JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
+      {}
+
+      enum {
+        category = SolverCategory::sequential
+      };
+
+
+      void preApply(X& x, Y& d, const Y& b)
       {
         if (num_iter == 1)
           JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,true,true);
@@ -386,38 +415,151 @@ namespace Dune
           JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,false,true);
         }
       }
-    };
 
-    struct JacobiPostsmoothDefect
-    {
-      template<typename M, typename X, typename Y, typename K>
-      static void apply(const M& A, X& x, Y& d, const Y& b, const K& w, int num_iter)
+      void postApply(X& x, Y& d, const Y& b)
       {
         for (int i=0; i<num_iter; i++)
           JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b,w);
       }
-    };
-//TODO this cannot work. we need an object for ilu smoothing
-//     template<typename M>
-//     class ILUSmoothDefect
-//     {
-//       public:
-//
-//
-//       template<typename X, typename Y>
-//       static void apply(const M& A, X& x, Y& d, const Y& b)
-//       {
-//         if (ilu_decomp.find(&A) == ilu_decomp.end())
-//         {
-//           ilu_decomp.insert(std::make_pair(&A, new M(A)));
-//           bilu0_decomposition(*ilu_decomp[&A]);
-//         }
-//       }
-//
-//       private:
-//       std::map<const M*,M*> ilu_decomp;
-//     };
 
+      private:
+      const M& A;
+      int num_iter;
+      Field w;
+    };
+
+    template<typename M, typename X, typename Y>
+    struct ConstructionTraits<JacobiWithDefect<M,X,Y> >
+    {
+      typedef DefaultConstructionArgs<JacobiWithDefect<M,X,Y> > Arguments;
+
+      static inline JacobiWithDefect<M,X,Y>* construct(Arguments& args)
+      {
+        return new JacobiWithDefect<M,X,Y>(args.getMatrix(),args.getArgs().iterations,args.getArgs().relaxationFactor);
+      }
+
+      static void deconstruct(JacobiWithDefect<M,X,Y>* obj)
+      {
+        delete obj;
+      }
+    };
+
+    template<typename M,typename X,typename Y>
+    struct SmootherTraits<JacobiWithDefect<M,X,Y> >
+    {
+      typedef DefaultSmootherArgs<typename M::field_type> Arguments;
+    };
+
+    template<typename M,typename X,typename Y>
+    struct SmootherCalculatesDefect<JacobiWithDefect<M,X,Y> >
+    {
+      enum {
+        value = true
+      };
+    };
+
+    template<typename M, typename X, typename Y>
+    class ILUWithDefect
+    {
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef typename X::field_type field_type;
+      typedef typename X::field_type Field;
+
+      enum {
+        category = SolverCategory::sequential
+      };
+
+
+      ILUWithDefect(const M& A_, int n, Field w_) : A(A_), decomp(A.N(), A.M(),M::row_wise), w(w_)
+      {
+        if (n==0)
+        {
+          decomp = A;
+          bilu0_decomposition(decomp);
+        }
+        else
+          bilu_decomposition(A,n,decomp);
+      }
+
+      void preApply(X& x, Y& d, const Y& b)
+      {
+        // iterator types
+        typedef typename M::ConstRowIterator rowiterator;
+        typedef typename M::ConstColIterator coliterator;
+        typedef typename Y::block_type Yblock;
+        typedef typename X::block_type Xblock;
+
+        // lower triangular solve
+        rowiterator endi=A.end();
+        for (rowiterator row=A.begin(); row!=endi; ++row)
+        {
+          Yblock rhs(b[row.index()]);
+          for (coliterator col=row->begin(); col.index()<row.index(); ++col)
+            col->mmv(x[col.index()],rhs);
+          x[row.index()] = rhs;           // Lii = I
+        }
+
+        // upper triangular solve
+        rowiterator rendi=A.beforeBegin();
+        for (rowiterator row=A.beforeEnd(); row!=rendi; --row)
+        {
+          Xblock rhs(x[row.index()]);
+          coliterator col;
+          for (col=row->beforeEnd(); col.index()>row.index(); --col)
+            col->mmv(x[col.index()],rhs);
+          x[row.index()] = 0;
+            col->umv(rhs,x[row.index()]);           // diagonal stores inverse!
+
+          col = row->begin();
+          coliterator colEnd = row->end();
+          for (; col != colEnd; ++col)
+            col->mmv(x[row.index()],d[col.index()]);
+          //TODO introduce iterator over x
+        }
+      }
+
+      void postApply(X& x, Y& d, const Y& b)
+      {
+        bilu_backsolve(decomp,x,b);
+      }
+
+      private:
+      const M& A;
+      M decomp;
+      Field w;
+    };
+
+    template<typename M, typename X, typename Y>
+    struct ConstructionTraits<ILUWithDefect<M,X,Y> >
+    {
+      typedef ConstructionArgs<SeqILUn<M,X,Y> > Arguments;
+
+      static inline ILUWithDefect<M,X,Y>* construct(Arguments& args)
+      {
+        return new ILUWithDefect<M,X,Y>(args.getMatrix(), args.getN(), args.getArgs().relaxationFactor);
+      }
+
+      static void deconstruct(ILUWithDefect<M,X,Y>* obj)
+      {
+        delete obj;
+      }
+    };
+
+    template<typename M, typename X, typename Y>
+    struct SmootherTraits<ILUWithDefect<M,X,Y> >
+    {
+      typedef DefaultSmootherArgs<typename M::field_type> Arguments;
+    };
+
+    template<typename M, typename X, typename Y>
+    struct SmootherCalculatesDefect<ILUWithDefect<M,X,Y> >
+    {
+      enum {
+        value = true
+      };
+    };
 
   } // end namespace Amg
 } // end namespace Dune

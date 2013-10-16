@@ -60,6 +60,7 @@ void testAMG(int N, int coarsenTarget, int ml)
   if(N<6) {
     Dune::printmatrix(std::cout, mat, "A", "row");
     Dune::printvector(std::cout, x, "x", "row");
+    Dune::printvector(std::cout, b, "b", "row");
   }
 
   Dune::Timer watch;
@@ -78,17 +79,27 @@ void testAMG(int N, int coarsenTarget, int ml)
   criterion.setSkipIsolated(false);
 
   Dune::SeqScalarProduct<Vector> sp;
-  typedef Dune::Amg::FastAMG<Operator,Vector> AMG;
+
+//   typedef Dune::Amg::GaussSeidelWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
+  //typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
+  //typedef Dune::Amg::ILUWithDefect<typename Operator::matrix_type, Vector, Vector> Smoother;
+  typedef Dune::SeqILU0<typename Operator::matrix_type, Vector, Vector> Smoother;
+
+  typedef Dune::Amg::FastAMG<Operator,Vector, Smoother> AMG;
   Dune::Amg::Parameters parms;
 
-  AMG amg(fop, criterion, parms);
+  typedef typename Dune::Amg::SmootherTraits<Smoother>::Arguments SmootherArgs;
+  SmootherArgs smootherArgs;
+  smootherArgs.iterations = 3;
+
+  AMG amg(fop, criterion, parms,smootherArgs);
 
   double buildtime = watch.elapsed();
 
   std::cout<<"Building hierarchy took "<<buildtime<<" seconds"<<std::endl;
 
   Dune::GeneralizedPCGSolver<Vector> amgCG(fop,amg,1e-6,80,2);
-  //Dune::LoopSolver<Vector> amgCG(fop, amg, 1e-4, 10000, 2);
+//   Dune::LoopSolver<Vector> amgCG(fop, amg, 1e-4, 10000, 2);
   watch.reset();
   Dune::InverseOperatorResult r;
   amgCG.apply(x,b,r);
@@ -113,7 +124,7 @@ int main(int argc, char** argv)
 {
 
   int N=100;
-  int coarsenTarget=1200;
+  int coarsenTarget=120;
   int ml=10;
 
   if(argc>1)
@@ -125,7 +136,7 @@ int main(int argc, char** argv)
   if(argc>3)
     ml = atoi(argv[3]);
 
-  testAMG<1>(N, coarsenTarget, ml);
+  //testAMG<1>(N, coarsenTarget, ml);
   testAMG<2>(N, coarsenTarget, ml);
 
 }
