@@ -327,13 +327,78 @@ namespace Dune
       SeqILUn<M,X,Y>* smoother;
     };
 
-    //! helper struct to implement one step of symmetric Gauss Seidel
-    //TODO implement block recursion
-    template<int level>
-    struct GaussSeidelStepWithDefect
+    /** @brief a symmetric Gauss-Seidel smoother that does compute defects
+     * @tparam M the matrix type
+     * @tparam X the domain type
+     * @tparam Y the range type
+     * fulfills the interface required by FastAMG. Options may be passed via the
+     * DefaultSmootherArgs factory concept.
+     */
+    template<typename M, typename X, typename Y>
+    class GaussSeidelWithDefect
     {
-      template<typename M, typename X, typename Y>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first=false, bool compDef=false)
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef typename X::field_type field_type;
+      typedef typename X::field_type Field;
+      typedef X domain_type;
+      typedef X Domain;
+      typedef Y range_type;
+      typedef Y Range;
+
+      //! the type of coarse grid smoother that fits this smoother in AMG
+      typedef typename Dune::SeqGS<M,X,Y> RecommendedCoarseSmoother;
+
+      /** @brief construct a symetric Gauss-Seidel smoother that computes defects
+       * @param A_ the matrix them smoother operates on
+       * @param num_iter_ the number of iterations done by the smoother
+       * TODO do we want relaxation here?
+       * These parameters may be provided via the ConstructionTraits class!
+       */
+      GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
+      {}
+
+      enum {
+        /** @brief The solver category */
+        category = SolverCategory::sequential
+      };
+
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(X& x, Y& d, const Y& b)
+      {
+        // perform iterations. These have to know whether they are first
+        // and whether to compute a defect.
+        if (num_iter == 1)
+          forward_apply(A,x,d,b,true,true);
+        else
+        {
+          forward_apply(A,x,d,b,true,false);
+          for (int i=0; i<num_iter-2; i++)
+            forward_apply(A,x,d,b, false,false);
+          forward_apply(A,x,d,b,false,true);
+        }
+      }
+
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void postApply(X& x, Y& d,
+                        const Y& b)
+      {
+        for (int i=0; i<num_iter; i++)
+          backward_apply(A,x,d,b);
+      }
+
+      private:
+      //! do one forward step
+      void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -382,9 +447,8 @@ namespace Dune
         }
       }
 
-      template<typename M, typename X, typename Y>
-      static void backward_apply(const M& A, X& x, Y& d,
-                        const Y& b)
+      //! do one backward step
+      void backward_apply(const M& A, X& x, Y& d, const Y& b)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -413,96 +477,7 @@ namespace Dune
           diag->solve(*xIter,*dIter);
         }
       }
-    };
 
-    //! specialization for blocklevel 0
-    //TODO this is non-functioning
-    template<>
-    struct GaussSeidelStepWithDefect<0>
-    {
-      template<typename M, typename X, typename Y>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
-      {
-        A.solve(x,d);
-      }
-
-      template<typename M, typename X, typename Y>
-      static void backward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
-      {
-        A.solve(x,d);
-      }
-    };
-
-    /** @brief a symmetric Gauss-Seidel smoother that does compute defects
-     * @tparam M the matrix type
-     * @tparam X the domain type
-     * @tparam Y the range type
-     * fulfills the interface required by FastAMG. Options may be passed via the
-     * DefaultSmootherArgs factory concept.
-     */
-    template<typename M, typename X, typename Y>
-    class GaussSeidelWithDefect
-    {
-      public:
-      typedef M matrix_type;
-      typedef M Matrix;
-      typedef typename X::field_type field_type;
-      typedef typename X::field_type Field;
-      typedef X domain_type;
-      typedef X Domain;
-      typedef Y range_type;
-      typedef Y Range;
-
-      //! the type of coarse grid smoother that fits this smoother in AMG
-      typedef typename Dune::SeqGS<M,X,Y> RecommendedCoarseSmoother;
-
-      /** @brief construct a symetric Gauss-Seidel smoother that computes defects
-       * @param A_ the matrix them smoother operates on
-       * @param num_iter_ the number of iterations done by the smoother
-       * TODO do we want relaxation here?
-       * These parameters may be provided via the ConstructionTraits class!
-       */
-      GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
-      {}
-
-      enum {
-        /** @brief The solver category */
-        category = SolverCategory::sequential
-      };
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(X& x, Y& d, const Y& b)
-      {
-        // perform iterations. These have to know whether they are first
-        // and whether to compute a defect.
-        if (num_iter == 1)
-          GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,true);
-        else
-        {
-          GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,true,false);
-          for (int i=0; i<num_iter-2; i++)
-            GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b, false,false);
-          GaussSeidelStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,false,true);
-        }
-      }
-
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(X& x, Y& d,
-                        const Y& b)
-      {
-        for (int i=0; i<num_iter; i++)
-          GaussSeidelStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b);
-      }
-
-      private:
       const M& A;
       int num_iter;
     };
@@ -540,14 +515,75 @@ namespace Dune
       };
     };
 
-    //! helper struct to implement one step of symmetric Jacobi iteration
-    //TODO implement block recursion
-    //TODO check back to damping and compare to gsetc.hh
-    template<std::size_t level>
-    struct JacobiStepWithDefect
+    /** @brief a symmetric Jacobi smoother that does compute defects
+     * @tparam M the matrix type
+     * @tparam X the domain type
+     * @tparam Y the range type
+     * fulfills the interface required by FastAMG. Options may be passed via the
+     * DefaultSmootherArgs factory concept.
+     */
+    template<typename M, typename X, typename Y>
+    class JacobiWithDefect
     {
-      template<typename M, typename X, typename Y, typename K>
-      static void forward_apply(const M& A, X& x, Y& d, const Y& b, const K& w, bool first, bool compDef)
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef typename M::field_type field_type;
+      typedef typename M::field_type Field;
+      typedef X domain_type;
+      typedef X Domain;
+      typedef Y range_type;
+      typedef Y Range;
+
+      //! the type of coarse grid smoother that fits this smoother in AMG
+      typedef typename Dune::SeqJac<M,X,Y> RecommendedCoarseSmoother;
+
+      /** @brief construct a symmetric Jacobi smoother that computes defects
+       * @param A_ the matrix the smoother operates on
+       * @param num_iter_ the number of iterations done by the smoother
+       * @param w_ the relaxation factor
+       * These parameters may be provided via the ConstructionTraits class!
+       */
+      JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
+      {}
+
+      enum {
+        /** @brief The solver category */
+        category = SolverCategory::sequential
+      };
+
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(X& x, Y& d, const Y& b)
+      {
+        if (num_iter == 1)
+          forward_apply(A,x,d,b,true,true);
+        else
+        {
+          forward_apply(A,x,d,b,true,false);
+          for (int i=0; i<num_iter-2; i++)
+            forward_apply(A,x,d,b,false,false);
+          forward_apply(A,x,d,b,false,true);
+        }
+      }
+
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void postApply(X& x, Y& d, const Y& b)
+      {
+        for (int i=0; i<num_iter; i++)
+          backward_apply(A,x,d,b);
+      }
+
+      private:
+      //! do one forward step
+      void forward_apply(const M& A, X& x, Y& d, const Y& b, bool first, bool compDef)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -611,12 +647,12 @@ namespace Dune
             }
           }
           x *= w;
-          x.axpy(K(1)-w,xold);
+          x.axpy(Field(1)-w,xold);
         }
       }
 
-      template<typename M, typename X, typename Y, typename K>
-      static void backward_apply(const M& A, X& x, Y& d, const Y& b, const K& w)
+      //! do one backward step
+      void backward_apply(const M& A, X& x, Y& d, const Y& b)
       {
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
@@ -645,77 +681,9 @@ namespace Dune
           diag->solve(*xIter,r);
         }
         x *= w;
-        x.axpy(K(1)-w,xold);
-      }
-    };
-
-    /** @brief a symmetric Jacobi smoother that does compute defects
-     * @tparam M the matrix type
-     * @tparam X the domain type
-     * @tparam Y the range type
-     * fulfills the interface required by FastAMG. Options may be passed via the
-     * DefaultSmootherArgs factory concept.
-     */
-    template<typename M, typename X, typename Y>
-    class JacobiWithDefect
-    {
-      public:
-      typedef M matrix_type;
-      typedef M Matrix;
-      typedef typename M::field_type field_type;
-      typedef typename M::field_type Field;
-      typedef X domain_type;
-      typedef X Domain;
-      typedef Y range_type;
-      typedef Y Range;
-
-      //! the type of coarse grid smoother that fits this smoother in AMG
-      typedef typename Dune::SeqJac<M,X,Y> RecommendedCoarseSmoother;
-
-      /** @brief construct a symmetric Jacobi smoother that computes defects
-       * @param A_ the matrix the smoother operates on
-       * @param num_iter_ the number of iterations done by the smoother
-       * @param w_ the relaxation factor
-       * These parameters may be provided via the ConstructionTraits class!
-       */
-      JacobiWithDefect(const M& A_, int num_iter_, Field w_) : A(A_), num_iter(num_iter_), w(w_)
-      {}
-
-      enum {
-        /** @brief The solver category */
-        category = SolverCategory::sequential
-      };
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(X& x, Y& d, const Y& b)
-      {
-        if (num_iter == 1)
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,true,true);
-        else
-        {
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,true,false);
-          for (int i=0; i<num_iter-2; i++)
-            JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,false,false);
-          JacobiStepWithDefect<M::blocklevel>::forward_apply(A,x,d,b,w,false,true);
-        }
+        x.axpy(Field(1)-w,xold);
       }
 
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(X& x, Y& d, const Y& b)
-      {
-        for (int i=0; i<num_iter; i++)
-          JacobiStepWithDefect<M::blocklevel>::backward_apply(A,x,d,b,w);
-      }
-
-      private:
       const M& A;
       int num_iter;
       Field w;
