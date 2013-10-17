@@ -36,6 +36,25 @@ namespace Dune
       };
     };
 
+    struct GenericDefect
+    {
+      template<typename M, typename X, typename Y>
+      static void calculate(const M& A, const X& x, Y& d, const Y& b)
+      {
+        //defect calculation
+        typedef typename M::ConstRowIterator RowIterator;
+        typedef typename M::ConstColIterator ColIterator;
+        typename Y::iterator dIter = d.begin();
+        typename Y::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
+        }
+      }
+    };
+
     //! implementation for smoothers that calculate defects
     template<class S, bool p>
     class SmootherWithDefectHelper
@@ -114,18 +133,8 @@ namespace Dune
       {
         // apply the preconditioner
         SmootherApplier<S>::preSmooth(*smoother,x,b);
-
-        //defect calculation
-        typedef typename Matrix::ConstRowIterator RowIterator;
-        typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::iterator dIter = d.begin();
-        typename Range::const_iterator bIter = b.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
-        {
-          *dIter = *bIter;
-          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
-        }
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
       }
 
       /** @brief apply the smoother in an AMG postSmoothing stage
@@ -210,18 +219,8 @@ namespace Dune
       {
         // apply the preconditioner
         SmootherApplier<SeqILU0<M,X,Y> >::preSmooth(*smoother,x,b);
-
-        //defect calculation
-        typedef typename Matrix::ConstRowIterator RowIterator;
-        typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::iterator dIter = d.begin();
-        typename Range::const_iterator bIter = b.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
-        {
-          *dIter = *bIter;
-          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
-        }
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
       }
 
       /** @brief apply the smoother in an AMG postSmoothing stage
@@ -231,17 +230,8 @@ namespace Dune
        */
       void postApply(Domain& x, Range& d, const Range& b)
       {
-        //defect calculation
-        typedef typename Matrix::ConstRowIterator RowIterator;
-        typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::iterator dIter = d.begin();
-        typename Range::const_iterator bIter = b.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
-        {
-          *dIter = *bIter;
-          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
-        }
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
 
         Domain v(x);
         SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
@@ -284,18 +274,8 @@ namespace Dune
       {
         // apply the preconditioner
         SmootherApplier<SeqILUn<M,X,Y> >::preSmooth(*smoother,x,b);
-
-        //defect calculation
-        typedef typename Matrix::ConstRowIterator RowIterator;
-        typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::iterator dIter = d.begin();
-        typename Range::const_iterator bIter = b.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
-        {
-          *dIter = *bIter;
-          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
-        }
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
       }
 
       /** @brief apply the smoother in an AMG postSmoothing stage
@@ -305,17 +285,8 @@ namespace Dune
        */
       void postApply(Domain& x, Range& d, const Range& b)
       {
-        //defect calculation
-        typedef typename Matrix::ConstRowIterator RowIterator;
-        typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::iterator dIter = d.begin();
-        typename Range::const_iterator bIter = b.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
-        {
-          *dIter = *bIter;
-          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
-        }
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
 
         Domain v(x);
         SmootherApplier<SeqILUn<M,X,Y> >::postSmooth(*smoother,v,d);
