@@ -58,12 +58,22 @@ namespace Dune
         ConstructionTraits<S>::deconstruct(smoother);
       }
 
-       void preApply(Domain& x, Range& d, const Range& b)
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
         smoother->preApply(x,d,b);
       }
 
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void postApply(Domain& x, Range& d, const Range& b)
       {
         smoother->postApply(x,d,b);
@@ -95,6 +105,11 @@ namespace Dune
         ConstructionTraits<S>::deconstruct(smoother);
       }
 
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void preApply(Domain& x, Range& d, const Range& b)
       {
         // apply the preconditioner
@@ -113,6 +128,11 @@ namespace Dune
         }
       }
 
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
       void postApply(Domain& x, Range& d, const Range& b)
       {
         SmootherApplier<S>::postSmooth(*smoother,x,b);
@@ -124,7 +144,8 @@ namespace Dune
     };
 
     /** @brief helper class to use normal smoothers with fastamg
-     * Wrapper class around the smoother (S), that fulfills the interface required from
+     *  @tparam S the smoother to be wrapped
+     * Wrapper class around the smoother, that fulfills the interface required from
      * FastAMG for a smoother. If S itself fulfills this interface, no functionality is
      * added. If not, the calls are forwarded to the preconditioner interface and generic
      * defect calculation is added.
@@ -625,6 +646,9 @@ namespace Dune
         typedef typename M::ConstColIterator coliterator;
         typedef typename Y::block_type Yblock;
         typedef typename X::block_type Xblock;
+
+        //TODO check whether this can be done better
+        d = b;
 
         // lower triangular solve
         rowiterator endi=A.end();
