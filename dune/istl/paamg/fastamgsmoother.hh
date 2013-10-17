@@ -101,13 +101,16 @@ namespace Dune
         SmootherApplier<S>::preSmooth(*smoother,x,b);
 
         //defect calculation
-        d = b;
         typedef typename Matrix::ConstRowIterator RowIterator;
         typedef typename Matrix::ConstColIterator ColIterator;
-        typename Range::const_iterator xIter = x.begin();
-        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++xIter)
+        typename Range::iterator dIter = d.begin();
+        typename Range::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
           for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(*xIter,d[col.index()]);
+            col->mmv(x[col.index()],*dIter);
+        }
       }
 
       void postApply(Domain& x, Range& d, const Range& b)
