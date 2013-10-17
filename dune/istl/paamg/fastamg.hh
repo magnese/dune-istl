@@ -24,10 +24,9 @@
 
 /** @file
  * @author Markus Blatt
- * @brief A fast AMG method, that currently only allows only Gauss-Seidel
- * smoothing and is currently purely sequential. It
- * combines one Gauss-Seidel presmoothing sweep with
- * the defect calculation to reduce memory transfers.
+ * @brief A fast AMG method, that does smoothing and defect calculation simultaneously
+ * The method is purely sequential at the moment. It combines the presmoothing
+ * sweep with the defect calculation to reduce memory transfers.
  */
 
 namespace Dune
@@ -340,11 +339,6 @@ namespace Dune
         symmetric(symmetric_), coarsesolverconverged(true),
         coarseSmoother_(), verbosity_(parms.debugLevel())
     {
-//       if(preSteps_>1||postSteps_>1)
-//       {
-//         std::cerr<<"WARNING only one step of smoothing is supported!"<<std::endl;
-//         preSteps_=postSteps_=0;
-//       }
       assert(matrices_->isBuilt());
       dune_static_assert((is_same<PI,SequentialInformation>::value), "Currently only sequential runs are supported");
 
@@ -364,11 +358,6 @@ namespace Dune
         buildHierarchy_(true), symmetric(symmetric_), coarsesolverconverged(true),
         coarseSmoother_(), verbosity_(criterion.debugLevel())
     {
-      if(preSteps_>1||postSteps_>1)
-      {
-        std::cerr<<"WARNING only one step of smoothing is supported!"<<std::endl;
-        preSteps_=postSteps_=1;
-      }
       dune_static_assert((is_same<PI,SequentialInformation>::value), "Currently only sequential runs are supported");
       // TODO: reestablish compile time checks.
       //dune_static_assert(static_cast<int>(PI::category)==static_cast<int>(S::category),
@@ -680,20 +669,13 @@ namespace Dune
     void FastAMG<M,X,S,PI,A>
     ::presmooth(LevelContext& levelContext, Domain& x, const Range& b)
     {
-     // SmootherWithDefect<GaussSeidelWithDefect> smoother;
-    //  SmootherWithDefect<SeqJac<typename M::matrix_type, Domain, Range> > smoother(levelContext.matrix->getmat(),1,1.0);
       levelContext.smoother->preApply(x, *levelContext.residual,b);
-      //levelContext.smoother->apply(x, b);
-      //GaussSeidelWithDefect<typename M::matrix_type,X,X>::preApply(levelContext.matrix->getmat(),x, *levelContext.residual,b);
     }
 
     template<class M, class X, class S, class PI, class A>
     void FastAMG<M,X,S,PI,A>
     ::postsmooth(LevelContext& levelContext, Domain& x, const Range& b)
     {
-      //double w = 0.75;
-      //SmootherWithDefect<GaussSeidelWithDefect> smoother;
-      //SmootherWithDefect<SeqJac<typename M::matrix_type, Domain, Range> > smoother(levelContext.matrix->getmat(),1,1.0);
       levelContext.smoother->postApply(x, *levelContext.residual, b);
     }
 
