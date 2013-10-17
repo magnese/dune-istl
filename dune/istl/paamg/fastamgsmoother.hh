@@ -124,7 +124,7 @@ namespace Dune
         {
           *dIter = *bIter;
           for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
-            col->mmv(x[col.index()],*dIter);
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
         }
       }
 
@@ -177,6 +177,154 @@ namespace Dune
     struct SmootherTraits<SmootherWithDefect<S> >
     {
       typedef typename SmootherTraits<S>::Arguments Arguments;
+    };
+
+    //! ILU needs specialization
+    template<typename M, typename X, typename Y>
+    class SmootherWithDefectHelper<SeqILU0<M,X,Y>,false>
+    {
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef X Domain;
+      typedef Y Range;
+      typedef SeqILU0<M,X,Y> RecommendedCoarseSmoother;
+
+      SmootherWithDefectHelper(typename ConstructionTraits<SeqILU0<M,X,Y> >::Arguments& args)
+        : A(args.getMatrix())
+      {
+        smoother = ConstructionTraits<SeqILU0<M,X,Y> >::construct(args);
+      }
+
+      ~SmootherWithDefectHelper()
+      {
+        ConstructionTraits<SeqILU0<M,X,Y> >::deconstruct(smoother);
+      }
+
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(Domain& x, Range& d, const Range& b)
+      {
+        // apply the preconditioner
+        SmootherApplier<SeqILU0<M,X,Y> >::preSmooth(*smoother,x,b);
+
+        //defect calculation
+        typedef typename Matrix::ConstRowIterator RowIterator;
+        typedef typename Matrix::ConstColIterator ColIterator;
+        typename Range::iterator dIter = d.begin();
+        typename Range::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
+        }
+      }
+
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void postApply(Domain& x, Range& d, const Range& b)
+      {
+        //defect calculation
+        typedef typename Matrix::ConstRowIterator RowIterator;
+        typedef typename Matrix::ConstColIterator ColIterator;
+        typename Range::iterator dIter = d.begin();
+        typename Range::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
+        }
+
+        Domain v(x);
+        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
+        x += v;
+      }
+
+      private:
+      const Matrix& A;
+      SeqILU0<M,X,Y>* smoother;
+    };
+
+    //! ILU needs specialization
+    template<typename M, typename X, typename Y>
+    class SmootherWithDefectHelper<SeqILUn<M,X,Y>,false>
+    {
+      public:
+      typedef M matrix_type;
+      typedef M Matrix;
+      typedef X Domain;
+      typedef Y Range;
+      typedef SeqILUn<M,X,Y> RecommendedCoarseSmoother;
+
+      SmootherWithDefectHelper(typename ConstructionTraits<SeqILUn<M,X,Y> >::Arguments& args)
+        : A(args.getMatrix())
+      {
+        smoother = ConstructionTraits<SeqILUn<M,X,Y> >::construct(args);
+      }
+
+      ~SmootherWithDefectHelper()
+      {
+        ConstructionTraits<SeqILUn<M,X,Y> >::deconstruct(smoother);
+      }
+
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(Domain& x, Range& d, const Range& b)
+      {
+        // apply the preconditioner
+        SmootherApplier<SeqILUn<M,X,Y> >::preSmooth(*smoother,x,b);
+
+        //defect calculation
+        typedef typename Matrix::ConstRowIterator RowIterator;
+        typedef typename Matrix::ConstColIterator ColIterator;
+        typename Range::iterator dIter = d.begin();
+        typename Range::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
+        }
+      }
+
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void postApply(Domain& x, Range& d, const Range& b)
+      {
+        //defect calculation
+        typedef typename Matrix::ConstRowIterator RowIterator;
+        typedef typename Matrix::ConstColIterator ColIterator;
+        typename Range::iterator dIter = d.begin();
+        typename Range::const_iterator bIter = b.begin();
+        for(RowIterator row=A.begin(), end=A.end(); row != end; ++row, ++dIter, ++bIter)
+        {
+          *dIter = *bIter;
+          for (ColIterator col = row->begin(), cEnd = row->end(); col != cEnd; ++col)
+            col->mmv(x[col.index()],*dIter); //d_i -= a-ij * x_j
+        }
+
+        Domain v(x);
+        SmootherApplier<SeqILUn<M,X,Y> >::postSmooth(*smoother,v,d);
+        x += v;
+      }
+
+      private:
+      const Matrix& A;
+      SeqILUn<M,X,Y>* smoother;
     };
 
     //! helper struct to implement one step of symmetric Gauss Seidel
