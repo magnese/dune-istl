@@ -4,11 +4,8 @@
 #ifndef DUNE_ISTL_FASTAMG_HH
 #define DUNE_ISTL_FASTAMG_HH
 
-#include "fastamgsmoother.hh"
-
 #include <memory>
-#include <dune/common/exceptions.hh>
-#include <dune/istl/paamg/smoother.hh>
+#include <dune/istl/paamg/fastamgsmoother.hh>
 #include <dune/istl/paamg/transfer.hh>
 #include <dune/istl/paamg/hierarchy.hh>
 #include <dune/istl/solvers.hh>
