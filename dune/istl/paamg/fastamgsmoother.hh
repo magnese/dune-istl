@@ -3,9 +3,7 @@
 #ifndef DUNE_ISTL_FASTAMGSMOOTHER_HH
 #define DUNE_ISTL_FASTAMGSMOOTHER_HH
 
-#include <cstddef>
-
-#include "smoother.hh"
+#include <dune/istl/paamg/smoother.hh>
 
 namespace Dune
 {
@@ -13,6 +11,7 @@ namespace Dune
   {
     /** @file
      *  @brief Defines special smoothers that are able to calculate defects
+     *  @author Dominic Kempf
      *
      * A new interface to be used with FastAMG is introduced. A compatibility
      * class SmootherWithDefect<S> allows to construct a smoother from a smoother
@@ -319,7 +318,7 @@ namespace Dune
       typedef Y Range;
 
       //! the type of coarse grid smoother that fits this smoother in AMG
-      typedef typename Dune::SeqGS<M,X,Y> RecommendedCoarseSmoother;
+      typedef typename Dune::SeqSOR<M,X,Y> RecommendedCoarseSmoother;
 
       /** @brief construct a symetric Gauss-Seidel smoother that computes defects
        * @param A_ the matrix them smoother operates on
