@@ -294,10 +294,6 @@ namespace Dune
       ScalarProductPointer scalarProduct_;
       /** @brief Gamma, 1 for V-cycle and 2 for W-cycle. */
       std::size_t gamma_;
-      /** @brief The number of pre and postsmoothing steps. */
-      std::size_t preSteps_;
-      /** @brief The number of postsmoothing steps. */
-      std::size_t postSteps_;
       std::size_t level;
       bool buildHierarchy_;
       bool symmetric;
@@ -313,8 +309,7 @@ namespace Dune
     : matrices_(amg.matrices_), smootherArgs_(amg.smootherArgs),
       smoothers_(amg.smoothers_), solver_(amg.solver_),
       rhs_(), lhs_(), residual_(), scalarProduct_(amg.scalarProduct_),
-      gamma_(amg.gamma_), preSteps_(amg.preSteps_), postSteps_(amg.postSteps_),
-      symmetric(amg.symmetric), coarsesolverconverged(amg.coarsesolverconverged),
+      gamma_(amg.gamma_), symmetric(amg.symmetric), coarsesolverconverged(amg.coarsesolverconverged),
       coarseSmoother_(amg.coarseSmoother_), verbosity_(amg.verbosity_)
     {
       if(amg.rhs_)
@@ -331,8 +326,7 @@ namespace Dune
       : matrices_(&matrices), smootherArgs_(smootherArgs),
         smoothers_(new Hierarchy<Smoother,A>), solver_(&coarseSolver),
         rhs_(), lhs_(), residual_(), scalarProduct_(),
-        gamma_(parms.getGamma()), preSteps_(parms.getNoPreSmoothSteps()),
-        postSteps_(parms.getNoPostSmoothSteps()), buildHierarchy_(false),
+        gamma_(parms.getGamma()), buildHierarchy_(false),
         symmetric(symmetric_), coarsesolverconverged(true),
         coarseSmoother_(), verbosity_(parms.debugLevel())
     {
@@ -351,7 +345,6 @@ namespace Dune
                                const PI& pinfo)
       : smootherArgs_(smootherArgs), smoothers_(new Hierarchy<Smoother,A>), solver_(),
         rhs_(), lhs_(), residual_(), scalarProduct_(), gamma_(parms.getGamma()),
-        preSteps_(parms.getNoPreSmoothSteps()), postSteps_(parms.getNoPostSmoothSteps()),
         buildHierarchy_(true), symmetric(symmetric_), coarsesolverconverged(true),
         coarseSmoother_(), verbosity_(criterion.debugLevel())
     {
@@ -552,7 +545,7 @@ namespace Dune
         mgc(levelContext, v, b);
       }else
         mgc(levelContext, v, d);
-      if(postSteps_==0||matrices_->maxlevels()==1)
+      if(smootherArgs_.iterations==0||matrices_->maxlevels()==1)
         levelContext.pinfo->copyOwnerToAll(v, v);
     }
 
