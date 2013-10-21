@@ -37,10 +37,10 @@ namespace Dune
 
     struct GenericDefect
     {
+      /** @brief calculate a defect from given x and b */
       template<typename M, typename X, typename Y>
       static void calculate(const M& A, const X& x, Y& d, const Y& b)
       {
-        //defect calculation
         typedef typename M::ConstRowIterator RowIterator;
         typedef typename M::ConstColIterator ColIterator;
         typename Y::iterator dIter = d.begin();
@@ -54,101 +54,87 @@ namespace Dune
       }
     };
 
-    //! implementation for smoothers that calculate defects
+    //! apply the smoothers that calculate defects: calls are only forwarded
     template<class S, bool p>
-    class SmootherWithDefectHelper
+    struct SmootherWithDefectHelper
     {
-      public:
-      typedef typename S::matrix_type matrix_type;
-      typedef typename S::matrix_type Matrix;
-      typedef typename S::domain_type Domain;
-      typedef typename S::range_type Range;
-
       typedef typename S::RecommendedCoarseSmoother RecommendedCoarseSmoother;
 
-      SmootherWithDefectHelper(typename ConstructionTraits<S>::Arguments& args)
+      static void preApply(S& smoother, const typename S::matrix_type&, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
       {
-        smoother = ConstructionTraits<S>::construct(args);
+        smoother.preApply(x,d,b);
       }
 
-      ~SmootherWithDefectHelper()
+      static void postApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
       {
-        ConstructionTraits<S>::deconstruct(smoother);
+        smoother.postApply(x,d,b);
       }
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(Domain& x, Range& d, const Range& b)
-      {
-        // apply the preconditioner
-        smoother->preApply(x,d,b);
-      }
-
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(Domain& x, Range& d, const Range& b)
-      {
-        smoother->postApply(x,d,b);
-      }
-
-      private:
-      S* smoother;
     };
 
-    //! implementation for smoothers that dont calculate defects
+    //! apply smoothers that dont calculate defects: generic defect calculation is added
     template<class S>
-    class SmootherWithDefectHelper<S,false>
+    struct SmootherWithDefectHelper<S,false>
     {
-      public:
-      typedef typename S::matrix_type matrix_type;
-      typedef typename S::matrix_type Matrix;
-      typedef typename S::domain_type Domain;
-      typedef typename S::range_type Range;
       typedef S RecommendedCoarseSmoother;
 
-      SmootherWithDefectHelper(typename ConstructionTraits<S>::Arguments& args)
-        : A(args.getMatrix())
+      static void preApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
       {
-        smoother = ConstructionTraits<S>::construct(args);
-      }
-
-      ~SmootherWithDefectHelper()
-      {
-        ConstructionTraits<S>::deconstruct(smoother);
-      }
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(Domain& x, Range& d, const Range& b)
-      {
-        // apply the preconditioner
-        SmootherApplier<S>::preSmooth(*smoother,x,b);
-        // calculate the defect
+        smoother.apply(x,b);
         GenericDefect::calculate(A,x,d,b);
       }
 
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(Domain& x, Range& d, const Range& b)
+      static void postApply(S& smoother, const typename S::matrix_type&, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
       {
-        SmootherApplier<S>::postSmooth(*smoother,x,b);
+        smoother.apply(x,b);
+      }
+    };
+
+    //! ILU needs specialization to work with fastamg
+    template<typename M, typename X, typename Y>
+    struct SmootherWithDefectHelper<SeqILU0<M,X,Y>,false>
+    {
+      typedef SeqILU0<M,X,Y> S;
+      typedef SeqILU0<M,X,Y> RecommendedCoarseSmoother;
+
+      static void preApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      {
+        smoother.apply(x,b);
+        GenericDefect::calculate(A,x,d,b);
       }
 
-      private:
-      const Matrix& A;
-      S* smoother;
+      static void postApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      {
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
+
+        typename S::domain_type v(x);
+        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
+        x += v;
+      }
+    };
+
+    //! ILU needs specialization to work with fastamg
+    template<typename M, typename X, typename Y>
+    struct SmootherWithDefectHelper<SeqILUn<M,X,Y>,false>
+    {
+      typedef SeqILUn<M,X,Y> S;
+      typedef SeqILUn<M,X,Y> RecommendedCoarseSmoother;
+
+      static void preApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      {
+        smoother.apply(x,b);
+        GenericDefect::calculate(A,x,d,b);
+      }
+
+      static void postApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      {
+        // calculate the defect
+        GenericDefect::calculate(A,x,d,b);
+
+        typename S::domain_type v(x);
+        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
+        x += v;
+      }
     };
 
     /** @brief helper class to use normal smoothers with fastamg
@@ -159,8 +145,52 @@ namespace Dune
      * defect calculation is added.
      */
     template<class S>
-    struct SmootherWithDefect : public SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value >
-    {};
+    struct SmootherWithDefect
+    {
+      public:
+      typedef typename S::matrix_type matrix_type;
+      typedef typename S::matrix_type Matrix;
+      typedef typename S::domain_type Domain;
+      typedef typename S::range_type Range;
+
+      typedef typename SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>
+        ::RecommendedCoarseSmoother RecommendedCoarseSmoother;
+
+      SmootherWithDefect(typename ConstructionTraits<S>::Arguments& args)
+        : A(args.getMatrix()), smoother(ConstructionTraits<S>::construct(args))
+      {}
+
+      ~SmootherWithDefect()
+      {
+        ConstructionTraits<S>::deconstruct(smoother);
+      }
+
+      /** @brief apply the smoother in an AMG preSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void preApply(Domain& x, Range& d, const Range& b)
+      {
+        // apply the preconditioner
+        SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>::preApply(*smoother,A,x,d,b);
+      }
+
+      /** @brief apply the smoother in an AMG postSmoothing stage
+       * @param x the left hand side
+       * @param d the defect
+       * @param b the right hand side
+       */
+      void postApply(Domain& x, Range& d, const Range& b)
+      {
+        // apply the preconditioner
+        SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>::postApply(*smoother,A,x,d,b);
+      }
+
+      private:
+      const Matrix& A;
+      S* smoother;
+    };
 
     //! traits specialization: a wrapped smoother is constructed by taking the arguments
     //! of the normal smoother and forwarding them in the constructor
@@ -171,7 +201,7 @@ namespace Dune
 
       static inline SmootherWithDefect<S>* construct(Arguments& args)
       {
-        return static_cast<SmootherWithDefect<S>*>(new SmootherWithDefectHelper<S,SmootherCalculatesDefect<S>::value>(args));
+        return new SmootherWithDefect<S>(args);
       }
 
       static inline void deconstruct(SmootherWithDefect<S>* obj)
@@ -185,116 +215,6 @@ namespace Dune
     struct SmootherTraits<SmootherWithDefect<S> >
     {
       typedef typename SmootherTraits<S>::Arguments Arguments;
-    };
-
-    //! ILU needs specialization
-    template<typename M, typename X, typename Y>
-    class SmootherWithDefectHelper<SeqILU0<M,X,Y>,false>
-    {
-      public:
-      typedef M matrix_type;
-      typedef M Matrix;
-      typedef X Domain;
-      typedef Y Range;
-      typedef SeqILU0<M,X,Y> RecommendedCoarseSmoother;
-
-      SmootherWithDefectHelper(typename ConstructionTraits<SeqILU0<M,X,Y> >::Arguments& args)
-        : A(args.getMatrix())
-      {
-        smoother = ConstructionTraits<SeqILU0<M,X,Y> >::construct(args);
-      }
-
-      ~SmootherWithDefectHelper()
-      {
-        ConstructionTraits<SeqILU0<M,X,Y> >::deconstruct(smoother);
-      }
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(Domain& x, Range& d, const Range& b)
-      {
-        // apply the preconditioner
-        SmootherApplier<SeqILU0<M,X,Y> >::preSmooth(*smoother,x,b);
-        // calculate the defect
-        GenericDefect::calculate(A,x,d,b);
-      }
-
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(Domain& x, Range& d, const Range& b)
-      {
-        // calculate the defect
-        GenericDefect::calculate(A,x,d,b);
-
-        Domain v(x);
-        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
-        x += v;
-      }
-
-      private:
-      const Matrix& A;
-      SeqILU0<M,X,Y>* smoother;
-    };
-
-    //! ILU needs specialization
-    template<typename M, typename X, typename Y>
-    class SmootherWithDefectHelper<SeqILUn<M,X,Y>,false>
-    {
-      public:
-      typedef M matrix_type;
-      typedef M Matrix;
-      typedef X Domain;
-      typedef Y Range;
-      typedef SeqILUn<M,X,Y> RecommendedCoarseSmoother;
-
-      SmootherWithDefectHelper(typename ConstructionTraits<SeqILUn<M,X,Y> >::Arguments& args)
-        : A(args.getMatrix())
-      {
-        smoother = ConstructionTraits<SeqILUn<M,X,Y> >::construct(args);
-      }
-
-      ~SmootherWithDefectHelper()
-      {
-        ConstructionTraits<SeqILUn<M,X,Y> >::deconstruct(smoother);
-      }
-
-      /** @brief apply the smoother in an AMG preSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void preApply(Domain& x, Range& d, const Range& b)
-      {
-        // apply the preconditioner
-        SmootherApplier<SeqILUn<M,X,Y> >::preSmooth(*smoother,x,b);
-        // calculate the defect
-        GenericDefect::calculate(A,x,d,b);
-      }
-
-      /** @brief apply the smoother in an AMG postSmoothing stage
-       * @param x the left hand side
-       * @param d the defect
-       * @param b the right hand side
-       */
-      void postApply(Domain& x, Range& d, const Range& b)
-      {
-        // calculate the defect
-        GenericDefect::calculate(A,x,d,b);
-
-        Domain v(x);
-        SmootherApplier<SeqILUn<M,X,Y> >::postSmooth(*smoother,v,d);
-        x += v;
-      }
-
-      private:
-      const Matrix& A;
-      SeqILUn<M,X,Y>* smoother;
     };
 
     /** @brief a symmetric Gauss-Seidel smoother that does compute defects
@@ -323,7 +243,6 @@ namespace Dune
       /** @brief construct a symetric Gauss-Seidel smoother that computes defects
        * @param A_ the matrix them smoother operates on
        * @param num_iter_ the number of iterations done by the smoother
-       * TODO do we want relaxation here?
        * These parameters may be provided via the ConstructionTraits class!
        */
       GaussSeidelWithDefect(const M& A_, int num_iter_) : A(A_),num_iter(num_iter_)
