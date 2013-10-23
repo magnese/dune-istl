@@ -656,7 +656,7 @@ namespace Dune
           for(ColIterator col = row->begin(); col != endCol; ++col)
             if(aggregates[col.index()] != AggregatesMap<V>::ISOLATED) {
               assert(aggregates[row.index()]!=AggregatesMap<V>::UNAGGREGATED);
-              coarse[aggregates[row.index()]][aggregates[col.index()]]+=*col;
+              coarse.entry(aggregates[row.index()],aggregates[col.index()])+=*col;
             }
         }
 
@@ -664,10 +664,10 @@ namespace Dune
       typedef typename M::block_type BlockType;
       std::vector<BlockType> rowsize(coarse.N(),BlockType(0));
       for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
-        rowsize[row.index()]=coarse[row.index()][row.index()];
+        rowsize[row.index()]=coarse.entry(row.index(),row.index());
       pinfo.copyOwnerToAll(rowsize,rowsize);
       for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
-        coarse[row.index()][row.index()] = rowsize[row.index()];
+        coarse.entry(row.index(),row.index()) = rowsize[row.index()];
 
       // don't set dirichlet boundaries for copy lines to make novlp case work,
       // the preconditioner yields slightly different results now.

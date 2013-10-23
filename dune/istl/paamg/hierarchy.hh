@@ -914,19 +914,29 @@ namespace Dune
 
         VisitedMap2 visitedMap2(visited.begin(), Dune::IdentityMap());
 
-        typename MatrixOperator::matrix_type* coarseMatrix;
+        typedef typename MatrixOperator::matrix_type MT;
+        double old_avg = static_cast<double>(matrix->getmat().nonzeroes())/static_cast<double>(matrix->getmat().N());
+        typename MT::size_type avg = static_cast<typename MT::size_type>(old_avg + 2.);
 
-        coarseMatrix = productBuilder.build(matrix->getmat(), *(get<0>(graphs)), visitedMap2,
-                                            *info,
-                                            *aggregatesMap,
-                                            aggregates,
-                                            OverlapFlags());
+        typename MatrixOperator::matrix_type* coarseMatrix
+          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 1.1 ,MatrixOperator::matrix_type::mymode);
+
+       //    typename MatrixOperator::matrix_type* coarseMatrix;
+
+//         coarseMatrix = productBuilder.build(matrix->getmat(), *(get<0>(graphs)), visitedMap2,
+//                                             *info,
+//                                             *aggregatesMap,
+//                                             aggregates,
+//                                             OverlapFlags());
         dverb<<"Building of sparsity pattern took "<<watch.elapsed()<<std::endl;
-        watch.reset();
+
         info->freeGlobalLookup();
 
         delete get<0>(graphs);
         productBuilder.calculate(matrix->getmat(), *aggregatesMap, *coarseMatrix, *infoLevel, OverlapFlags());
+        CompressionStatistics<std::size_t> stats = coarseMatrix->compress();
+
+        std::cout << "Building of sparsity pattern and assembly took "<<watch.elapsed()<<std::endl;
 
         if(criterion.debugLevel()>2) {
           if(rank==0)
