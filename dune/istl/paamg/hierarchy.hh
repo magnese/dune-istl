@@ -697,6 +697,12 @@ namespace Dune
       infoLevel->buildGlobalLookup(mlevel->getmat().N());
       redistributes_.push_back(RedistributeInfoType());
 
+      // initialize a bcrs compression statistic object to allow recurisve heuristics on parameters
+      CompressionStatistics<typename M::matrix_type::size_type> compress_stats;
+      compress_stats.avg = static_cast<double>(mlevel->getmat().nonzeroes())/static_cast<double>(mlevel->getmat().N());
+      compress_stats.overflow_total = 0;
+      compress_stats.mem_ratio = 0.0;
+
       for(; level < criterion.maxLevel(); ++level, ++mlevel) {
         assert(matrices_.levels()==redistributes_.size());
         rank = infoLevel->communicator().rank();
@@ -914,30 +920,28 @@ namespace Dune
 
         VisitedMap2 visitedMap2(visited.begin(), Dune::IdentityMap());
 
-        typedef typename MatrixOperator::matrix_type MT;
         double old_avg = static_cast<double>(matrix->getmat().nonzeroes())/static_cast<double>(matrix->getmat().N());
-        typename MT::size_type avg = static_cast<typename MT::size_type>(old_avg + 2.);
+        typename M::matrix_type::size_type avg = static_cast<typename M::matrix_type::size_type>(compress_stats.avg) + 1;
 
         typename MatrixOperator::matrix_type* coarseMatrix
-          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 1.1 ,MatrixOperator::matrix_type::mymode);
+          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 1.05 ,MatrixOperator::matrix_type::mymode);
 
-       //    typename MatrixOperator::matrix_type* coarseMatrix;
 
 //         coarseMatrix = productBuilder.build(matrix->getmat(), *(get<0>(graphs)), visitedMap2,
 //                                             *info,
 //                                             *aggregatesMap,
 //                                             aggregates,
 //                                             OverlapFlags());
-        dverb<<"Building of sparsity pattern took "<<watch.elapsed()<<std::endl;
+        //dverb<<"Building of sparsity pattern took "<<watch.elapsed()<<std::endl;
 
         info->freeGlobalLookup();
 
         delete get<0>(graphs);
         productBuilder.calculate(matrix->getmat(), *aggregatesMap, *coarseMatrix, *infoLevel, OverlapFlags());
-        CompressionStatistics<std::size_t> stats = coarseMatrix->compress();
+        compress_stats = coarseMatrix->compress();
 
         std::cout << "Building of sparsity pattern and assembly took "<<watch.elapsed()<<std::endl;
-
+watch.reset();
         if(criterion.debugLevel()>2) {
           if(rank==0)
             std::cout<<"Calculation entries of Galerkin product took "<<watch.elapsed()<<" seconds."<<std::endl;
