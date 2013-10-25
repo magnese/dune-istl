@@ -1209,6 +1209,7 @@ watch.reset();
         ++level;
         ++info;
         ++riIter;
+        const_cast<Matrix&>(level->getmat()) = static_cast<typename M::field_type>(0);
         productBuilder.calculate(fine, *(*amap), const_cast<Matrix&>(level->getmat()), *info, copyFlags);
         if(level.isRedistributed()) {
           info->buildGlobalLookup(info->indexSet().size());
