@@ -920,11 +920,10 @@ namespace Dune
 
         VisitedMap2 visitedMap2(visited.begin(), Dune::IdentityMap());
 
-        double old_avg = static_cast<double>(matrix->getmat().nonzeroes())/static_cast<double>(matrix->getmat().N());
         typename M::matrix_type::size_type avg = static_cast<typename M::matrix_type::size_type>(compress_stats.avg) + 1;
 
         typename MatrixOperator::matrix_type* coarseMatrix
-          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 1.05 ,MatrixOperator::matrix_type::implicit);
+          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 0.05 ,MatrixOperator::matrix_type::implicit);
 
 
 //         coarseMatrix = productBuilder.build(matrix->getmat(), *(get<0>(graphs)), visitedMap2,
