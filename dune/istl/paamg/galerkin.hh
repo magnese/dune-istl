@@ -27,9 +27,60 @@ namespace Dune
      * based on a aggregation scheme.
      */
 
+    /** @brief A wrapper to treat with the BCRSMatrix build mode during Build Stage
+     * @tparam M the matrix typedef
+     * The used build mode of Dune::BCRSMatrix handles matrices different during
+     * assembly and afterwards. As we want to do both with the same implementation
+     * a wrapper is needed during the first assembly of the matrix hierarchy.
+     */
+    template<class M>
+    class BuildModeWrapper
+    {
+    public:
+      typedef typename M::ConstIterator ConstIterator;
+      typedef typename M::ConstColIterator ConstColIterator;
+      typedef typename M::block_type block_type;
+      typedef typename M::size_type size_type;
 
+      class row_object
+      {
+      public:
+        row_object(M& m, size_type i) : _m(m), _i(i) {}
 
+        block_type& operator[](size_type j)
+        {
+          return _m.entry(_i,j);
+        }
+      private:
+        M& _m;
+        size_type _i;
+      };
 
+      BuildModeWrapper(M& m) : _m(m) {}
+
+      row_object operator[](size_type i) const
+      {
+        return row_object(_m,i);
+      }
+
+      size_type N() const
+      {
+        return _m.N();
+      }
+
+      ConstIterator begin() const
+      {
+        return _m.begin();
+      }
+
+      ConstIterator end() const
+      {
+        return _m.end();
+      }
+
+    private:
+      M& _m;
+    };
 
     class GalerkinProduct
     {
