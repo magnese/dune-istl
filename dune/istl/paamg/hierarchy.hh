@@ -936,7 +936,9 @@ namespace Dune
         info->freeGlobalLookup();
 
         delete get<0>(graphs);
-        productBuilder.calculate(matrix->getmat(), *aggregatesMap, *coarseMatrix, *infoLevel, OverlapFlags());
+
+        BuildModeWrapper<typename M::matrix_type> wrapped(*coarseMatrix);
+        productBuilder.calculate(matrix->getmat(), *aggregatesMap, wrapped, *infoLevel, OverlapFlags());
         compress_stats = coarseMatrix->compress();
 
         std::cout << "Building of sparsity pattern and assembly took "<<watch.elapsed()<<std::endl;
