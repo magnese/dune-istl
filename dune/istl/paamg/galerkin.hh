@@ -93,10 +93,36 @@ namespace Dune
        * @param pinfo Parallel information about the fine level.
        * @param copy The attribute set identifying the copy nodes of the graph.
        */
-      template<class M, class V, class I, class O>
-      void calculate(const M& fine, const AggregatesMap<V>& aggregates, M& coarse,
+      template<class MF, class V, class MC, class I, class O>
+      void calculate(const MF& fine, const AggregatesMap<V>& aggregates, MC& coarse,
                      const I& pinfo, const O& copy);
+      {
+        typedef typename MF::ConstIterator RowIterator;
+        RowIterator endRow = fine.end();
 
+        for(RowIterator row = fine.begin(); row != endRow; ++row)
+          if(aggregates[row.index()] != AggregatesMap<V>::ISOLATED)
+          {
+            assert(aggregates[row.index()]!=AggregatesMap<V>::UNAGGREGATED);
+            typedef typename MF::ConstColIterator ColIterator;
+            ColIterator endCol = row->end();
+
+            for(ColIterator col = row->begin(); col != endCol; ++col)
+              if(aggregates[col.index()] != AggregatesMap<V>::ISOLATED)
+              {
+                assert(aggregates[row.index()]!=AggregatesMap<V>::UNAGGREGATED);
+                coarse[aggregates[row.index()]][aggregates[col.index()]]+=*col;
+              }
+          }
+
+        // get the right diagonal matrix values on copy lines from owner processes
+        typedef typename MF::block_type BlockType;
+        std::vector<BlockType> rowsize(coarse.N(),BlockType(0));
+        for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
+          rowsize[row.index()]=coarse[row.index()][row.index()];
+        pinfo.copyOwnerToAll(rowsize,rowsize);
+        for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
+          coarse[row.index()][row.index()] = rowsize[row.index()];
 
         // don't set dirichlet boundaries for copy lines to make novlp case work,
         // the preconditioner yields slightly different results now.
