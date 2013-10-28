@@ -677,7 +677,7 @@ namespace Dune
       static const int noints=(Dune::Amg::MAX_PROCESSES/4096>0) ? (Dune::Amg::MAX_PROCESSES/4096) : 1;
 
       typedef bigunsignedint<sizeof(int)*8*noints> BIGINT;
-      GalerkinProduct<ParallelInformation> productBuilder;
+      GalerkinProduct productBuilder;
       MatIterator mlevel = matrices_.finest();
       MatrixStats<typename M::matrix_type,MINIMAL_DEBUG_LEVEL<=INFO_DEBUG_LEVEL>::stats(mlevel->getmat());
 
@@ -1191,7 +1191,7 @@ watch.reset();
       typedef typename ParallelInformationHierarchy::Iterator InfoIterator;
 
       AggregatesMapIterator amap = aggregatesMaps_.begin();
-      BaseGalerkinProduct productBuilder;
+      GalerkinProduct productBuilder;
       InfoIterator info = parallelInformation_.finest();
       typename RedistributeInfoList::iterator riIter = redistributes_.begin();
       Iterator level = matrices_.finest(), coarsest=matrices_.coarsest();
