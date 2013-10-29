@@ -11,6 +11,7 @@
 #include <dune/istl/solvers.hh>
 #include <dune/istl/scalarproducts.hh>
 #include <dune/istl/superlu.hh>
+#include <dune/istl/umfpack.hh>
 #include <dune/istl/solvertype.hh>
 #include <dune/istl/io.hh>
 #include <dune/istl/preconditioners.hh>
@@ -410,7 +411,12 @@ namespace Dune
         coarseSmoother_.reset(ConstructionTraits<CoarseSmoother>::construct(cargs));
         scalarProduct_.reset(ScalarProductChooserType::construct(cargs.getComm()));
 
-#if HAVE_SUPERLU
+#if HAVE_SUPERLU|| HAVE_UMFPACK
+#if HAVE_UMFPACK
+#define DIRECTSOLVER UMFPack
+#else
+#define DIRECTSOLVER SuperLU
+#endif
         // Use superlu if we are purely sequential or with only one processor on the coarsest level.
         if(is_same<ParallelInformation,SequentialInformation>::value // sequential mode
            || matrices_->parallelInformation().coarsest()->communicator().size()==1 //parallel mode and only one processor
@@ -423,12 +429,13 @@ namespace Dune
           {
             if(matrices_->matrices().coarsest().getRedistributed().getmat().N()>0)
               // We are still participating on this level
-              solver_.reset(new SuperLU<typename M::matrix_type>(matrices_->matrices().coarsest().getRedistributed().getmat(), false, false));
+              solver_.reset(new DIRECTSOLVER<typename M::matrix_type>(matrices_->matrices().coarsest().getRedistributed().getmat(), false, false));
             else
               solver_.reset();
           }else
-            solver_.reset(new SuperLU<typename M::matrix_type>(matrices_->matrices().coarsest()->getmat(), false, false));
+            solver_.reset(new DIRECTSOLVER<typename M::matrix_type>(matrices_->matrices().coarsest()->getmat(), false, false));
         }else
+#undef DIRECTSOLVER
 #endif
         {
           if(matrices_->parallelInformation().coarsest().isRedistributed())
