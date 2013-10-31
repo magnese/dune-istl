@@ -108,7 +108,7 @@ namespace Dune
         GenericDefect::calculate(A,x,d,b);
 
         typename S::domain_type v(x);
-        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
+        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(smoother,v,d);
         x += v;
       }
     };
@@ -132,7 +132,7 @@ namespace Dune
         GenericDefect::calculate(A,x,d,b);
 
         typename S::domain_type v(x);
-        SmootherApplier<SeqILU0<M,X,Y> >::postSmooth(*smoother,v,d);
+        SmootherApplier<SeqILUn<M,X,Y> >::postSmooth(smoother,v,d);
         x += v;
       }
     };
