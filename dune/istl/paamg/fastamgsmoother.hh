@@ -65,7 +65,7 @@ namespace Dune
         smoother.preApply(x,d,b);
       }
 
-      static void postApply(S& smoother, const typename S::matrix_type& A, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      static void postApply(S& smoother, const typename S::matrix_type&, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
       {
         smoother.postApply(x,d,b);
       }
@@ -83,7 +83,7 @@ namespace Dune
         GenericDefect::calculate(A,x,d,b);
       }
 
-      static void postApply(S& smoother, const typename S::matrix_type&, typename S::domain_type& x, typename S::range_type& d, const typename S::range_type& b)
+      static void postApply(S& smoother, const typename S::matrix_type&, typename S::domain_type& x, typename S::range_type&, const typename S::range_type& b)
       {
         smoother.apply(x,b);
       }
