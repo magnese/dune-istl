@@ -192,6 +192,16 @@ namespace Dune
       S* smoother;
     };
 
+    //! any wrapped smoother calculates defects
+    template<typename S>
+    struct SmootherCalculatesDefect<SmootherWithDefect<S> >
+    {
+      enum
+      {
+        value = true
+      };
+    };
+
     //! traits specialization: a wrapped smoother is constructed by taking the arguments
     //! of the normal smoother and forwarding them in the constructor
     template<typename S>
