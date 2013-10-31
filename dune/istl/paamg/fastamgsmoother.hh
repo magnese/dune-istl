@@ -227,7 +227,7 @@ namespace Dune
       typedef typename SmootherTraits<S>::Arguments Arguments;
     };
 
-    /** @brief a symmetric Gauss-Seidel smoother that does compute defects
+    /** @brief a Gauss-Seidel smoother that does compute defects
      * @tparam M the matrix type
      * @tparam X the domain type
      * @tparam Y the range type
@@ -414,7 +414,7 @@ namespace Dune
       };
     };
 
-    /** @brief a symmetric Jacobi smoother that does compute defects
+    /** @brief a Jacobi smoother that does compute defects
      * @tparam M the matrix type
      * @tparam X the domain type
      * @tparam Y the range type
