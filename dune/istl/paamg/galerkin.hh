@@ -28,7 +28,7 @@ namespace Dune
      */
 
     /** @brief A wrapper to treat with the BCRSMatrix build mode during Build Stage
-     * @tparam M the matrix typedef
+     * @tparam M the matrix type
      * The used build mode of Dune::BCRSMatrix handles matrices different during
      * assembly and afterwards. As we want to do both with the same implementation
      * a wrapper is needed during the first assembly of the matrix hierarchy.
@@ -37,8 +37,6 @@ namespace Dune
     class BuildModeWrapper
     {
     public:
-      typedef typename M::ConstIterator ConstIterator;
-      typedef typename M::ConstColIterator ConstColIterator;
       typedef typename M::block_type block_type;
       typedef typename M::size_type size_type;
 
@@ -47,7 +45,7 @@ namespace Dune
       public:
         row_object(M& m, size_type i) : _m(m), _i(i) {}
 
-        block_type& operator[](size_type j)
+        block_type& operator[](size_type j) const
         {
           return _m.entry(_i,j);
         }
