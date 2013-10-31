@@ -123,68 +123,8 @@ namespace Dune
         pinfo.copyOwnerToAll(rowsize,rowsize);
         for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
           coarse[row.index()][row.index()] = rowsize[row.index()];
-
-        // don't set dirichlet boundaries for copy lines to make novlp case work,
-        // the preconditioner yields slightly different results now.
-
-        // Set the dirichlet border
-        //DirichletBoundarySetter<P>::template set<M>(coarse, pinfo, copy);
       }
     };
-
-    template<class T>
-    struct DirichletBoundarySetter
-    {
-      template<class M, class O>
-      static void set(M& coarse, const T& pinfo, const O& copy);
-    };
-
-    template<>
-    struct DirichletBoundarySetter<SequentialInformation>
-    {
-      template<class M, class O>
-      static void set(M& coarse, const SequentialInformation& pinfo, const O& copy);
-    };
-
-    template<class T>
-    template<class M, class O>
-    void DirichletBoundarySetter<T>::set(M& coarse, const T& pinfo, const O& copy)
-    {
-      typedef typename T::ParallelIndexSet::const_iterator ConstIterator;
-      ConstIterator end = pinfo.indexSet().end();
-      typedef typename M::block_type Block;
-      Block identity=Block(0.0);
-      for(typename Block::RowIterator b=identity.begin(); b !=  identity.end(); ++b)
-        b->operator[](b.index())=1.0;
-
-      for(ConstIterator index = pinfo.indexSet().begin();
-          index != end; ++index) {
-        if(copy.contains(index->local().attribute())) {
-          typedef typename M::ColIterator ColIterator;
-          typedef typename M::row_type Row;
-          Row row = coarse[index->local()];
-          ColIterator cend = row.find(index->local());
-          ColIterator col  = row.begin();
-          for(; col != cend; ++col)
-            *col = 0;
-
-          cend = row.end();
-
-          assert(col != cend); // There should be a diagonal entry
-          *col = identity;
-
-          for(++col; col != cend; ++col)
-            *col = 0;
-        }
-      }
-    }
-
-    template<class M, class O>
-    void DirichletBoundarySetter<SequentialInformation>::set(M& coarse,
-                                                             const SequentialInformation& pinfo,
-                                                             const O& overlap)
-    {}
-
   } // namespace Amg
 } // namespace Dune
 #endif
