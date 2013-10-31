@@ -68,14 +68,9 @@ namespace Dune
         return _m.N();
       }
 
-      ConstIterator begin() const
+      size_type M() const
       {
-        return _m.begin();
-      }
-
-      ConstIterator end() const
-      {
-        return _m.end();
+        return _m.M();
       }
 
     private:
@@ -118,11 +113,11 @@ namespace Dune
         // get the right diagonal matrix values on copy lines from owner processes
         typedef typename MF::block_type BlockType;
         std::vector<BlockType> rowsize(coarse.N(),BlockType(0));
-        for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
-          rowsize[row.index()]=coarse[row.index()][row.index()];
+        for (typename MF::size_type row = 0; row < coarse.N(); ++row)
+          rowsize[row] = coarse[row][row];
         pinfo.copyOwnerToAll(rowsize,rowsize);
-        for (RowIterator row = coarse.begin(); row != coarse.end(); ++row)
-          coarse[row.index()][row.index()] = rowsize[row.index()];
+        for (typename MF::size_type row = 0; row < coarse.N(); ++row)
+          coarse[row][row] = rowsize[row];
       }
     };
   } // namespace Amg
