@@ -937,7 +937,7 @@ namespace Dune
 
         delete get<0>(graphs);
 
-        BuildModeWrapper<typename M::matrix_type> wrapped(*coarseMatrix);
+        ImplicitMatrixBuilder<typename M::matrix_type> wrapped(*coarseMatrix);
         productBuilder.calculate(matrix->getmat(), *aggregatesMap, wrapped, *infoLevel, OverlapFlags());
         compress_stats = coarseMatrix->compress();
 
