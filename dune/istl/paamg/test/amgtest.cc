@@ -102,7 +102,7 @@ void testAMG(int N, int coarsenTarget, int ml)
   typedef Dune::Amg::CoarsenCriterion<Dune::Amg::UnSymmetricCriterion<BCRSMat,Dune::Amg::FirstDiagonal> >
   Criterion;
 
-//   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
 //   typedef Dune::SeqSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
 //   typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::SymmetricMultiplicativeSchwarzMode> Smoother;
 //   typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
