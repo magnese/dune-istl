@@ -82,7 +82,7 @@ void testAMG(int N, int coarsenTarget, int ml)
   Dune::SeqScalarProduct<Vector> sp;
 
 //   // smoothers reusulting in a symmetric AMG work like a charm and are 10% faster even when not optimized
-//   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
+   typedef Dune::SeqSSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
 //   typedef Dune::SeqSOR<typename Operator::matrix_type, Vector, Vector> Smoother;
 //   typedef Dune::SeqOverlappingSchwarz<BCRSMat,Vector,Dune::SymmetricMultiplicativeSchwarzMode> Smoother;
 //   typedef Dune::SeqGS<typename Operator::matrix_type, Vector, Vector> Smoother;
