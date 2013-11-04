@@ -40,7 +40,7 @@ namespace Dune
        */
       template<class MF, class V, class MC, class I, class O>
       void calculate(const MF& fine, const AggregatesMap<V>& aggregates, MC& coarse,
-                     const I& pinfo, const O& copy);
+                     const I& pinfo, const O& copy)
       {
         typedef typename MF::ConstIterator RowIterator;
         RowIterator endRow = fine.end();
