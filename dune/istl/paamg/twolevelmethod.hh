@@ -151,7 +151,7 @@ public:
   void createCoarseLevelSystem(const O& fineOperator)
   {
     prolongDamp_ = criterion_.getProlongationDampingFactor();
-    GalerkinProduct<ParallelInformation> productBuilder;
+    GalerkinProduct productBuilder;
     typedef typename Dune::Amg::MatrixGraph<const typename O::matrix_type> MatrixGraph;
     typedef typename Dune::Amg::PropertiesGraph<MatrixGraph,Dune::Amg::VertexProperties,
       Dune::Amg::EdgeProperties,Dune::IdentityMap,Dune::IdentityMap> PropertiesGraph;
@@ -184,12 +184,28 @@ public:
     for(Iterator iter= visited.begin(), end=visited.end();
         iter != end; ++iter)
           *iter=false;
-    matrix_.reset(productBuilder.build(fineOperator.getmat(), mg, vm,
-                                       SequentialInformation(),
-                                       *aggregatesMap_,
-                                       aggregates,
-                                       OverlapFlags()));
-    productBuilder.calculate(fineOperator.getmat(), *aggregatesMap_, *matrix_, pinfo, OverlapFlags());
+
+    // this average calculation mimicks the one in the standard AMG
+    typename O::matrix_type::size_type avg =
+      static_cast<typename O::matrix_type::size_type>(
+        static_cast<double>(fineOperator.getmat().nonzeroes())/static_cast<double>(fineOperator.getmat().N())
+        ) + 2;
+
+    matrix_.reset(
+      new typename O::matrix_type(
+        aggregates,
+        aggregates,
+        avg,
+        0.05,
+        O::matrix_type::implicit
+        )
+      );
+
+    ImplicitMatrixBuilder<typename O::matrix_type> matrixBuilder(*matrix_);
+
+    productBuilder.calculate(fineOperator.getmat(), *aggregatesMap_, matrixBuilder, pinfo, OverlapFlags());
+    matrix_->compress();
+
     this->lhs_.resize(this->matrix_->M());
     this->rhs_.resize(this->matrix_->N());
     this->operator_.reset(new O(*matrix_));
