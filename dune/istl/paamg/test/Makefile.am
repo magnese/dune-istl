@@ -2,7 +2,7 @@
 
 if MPI
   MPITESTS =
-  TESTPROGS = galerkintest hierarchytest pamgtest transfertest pamg_comm_repart_test
+  TESTPROGS = hierarchytest pamgtest transfertest pamg_comm_repart_test
 endif
 
 if DUNE_PTHREAD
@@ -27,15 +27,6 @@ transfertest_CPPFLAGS = $(AM_CPPFLAGS)		\
 transfertest_LDFLAGS = $(AM_LDFLAGS)		\
 	$(DUNEMPILDFLAGS)
 transfertest_LDADD =				\
-	$(DUNEMPILIBS)				\
-	$(LDADD)
-
-galerkintest_SOURCES = galerkintest.cc anisotropic.hh
-galerkintest_CPPFLAGS = $(AM_CPPFLAGS)		\
-	$(DUNEMPICPPFLAGS)
-galerkintest_LDFLAGS = $(AM_LDFLAGS)		\
-	$(DUNEMPILDFLAGS)
-galerkintest_LDADD =				\
 	$(DUNEMPILIBS)				\
 	$(LDADD)
 

@@ -4,7 +4,6 @@ Makefile.in
 .libs
 semantic.cache
 graphtest
-galerkintest
 hierarchytest
 amgtest
 pamgtest
