@@ -470,7 +470,9 @@ namespace Dune
       Timer watch;
       matrices_.reset(new OperatorHierarchy(matrix, pinfo));
 
-      matrices_->template build<NegateSet<typename PI::OwnerSet> >(criterion);
+      if(matrices_->template build<NegateSet<typename PI::OwnerSet> >(criterion))
+        DUNE_THROW(ISTLError, "Could not build matrix hierarchy. "
+                   <<"Probably the overflow region of the matrix was not sufficient!");
 
       // build the necessary smoother hierarchies
       matrices_->coarsenSmoother(*smoothers_, smootherArgs_);

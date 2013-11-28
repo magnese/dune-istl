@@ -369,7 +369,7 @@ namespace Dune
        * @brief criterion The criterion describing the aggregation process.
        */
       template<typename O, typename T>
-      void build(const T& criterion);
+      int build(const T& criterion);
 
       /**
        * @brief Recalculate the galerkin products.
@@ -667,7 +667,7 @@ namespace Dune
 
     template<class M, class IS, class A>
     template<typename O, typename T>
-    void MatrixHierarchy<M,IS,A>::build(const T& criterion)
+    int MatrixHierarchy<M,IS,A>::build(const T& criterion)
     {
       prolongDamp_ = criterion.getProlongationDampingFactor();
       typedef O OverlapFlags;
@@ -699,9 +699,15 @@ namespace Dune
 
       // initialize a bcrs compression statistic object to allow recurisve heuristics on parameters
       CompressionStatistics<typename M::matrix_type::size_type> compress_stats;
-      compress_stats.avg = static_cast<double>(mlevel->getmat().nonzeroes())/static_cast<double>(mlevel->getmat().N());
+      // This will be used as the averag number of nonzeros per row for the firt coarse level matrix.
+      // We use ceil to be on the safer side.
+      compress_stats.avg = std::ceil(static_cast<double>(mlevel->getmat().nonzeroes())/static_cast<double>(mlevel->getmat().N()));
       compress_stats.overflow_total = 0;
       compress_stats.mem_ratio = 0.0;
+
+      // Marker to check whether aggregation failed or not.
+      // A non-zero entry indicates failure.
+      int globalsuccess=0;
 
       for(; level < criterion.maxLevel(); ++level, ++mlevel) {
         assert(matrices_.levels()==redistributes_.size());
@@ -920,32 +926,49 @@ namespace Dune
 
         VisitedMap2 visitedMap2(visited.begin(), Dune::IdentityMap());
 
-        typename M::matrix_type::size_type avg = static_cast<typename M::matrix_type::size_type>(compress_stats.avg) + 1;
-
-        typename MatrixOperator::matrix_type* coarseMatrix
-          = new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , 0.05 ,MatrixOperator::matrix_type::implicit);
-
-
-//         coarseMatrix = productBuilder.build(matrix->getmat(), *(get<0>(graphs)), visitedMap2,
-//                                             *info,
-//                                             *aggregatesMap,
-//                                             aggregates,
-//                                             OverlapFlags());
-        //dverb<<"Building of sparsity pattern took "<<watch.elapsed()<<std::endl;
-
         info->freeGlobalLookup();
 
         delete get<0>(graphs);
 
-        ImplicitMatrixBuilder<typename M::matrix_type> wrapped(*coarseMatrix);
-        productBuilder.calculate(matrix->getmat(), *aggregatesMap, wrapped, *infoLevel, OverlapFlags());
-        compress_stats = coarseMatrix->compress();
+        typename M::matrix_type::size_type avg = std::ceil(compress_stats.avg);
 
-        std::cout << "Building of sparsity pattern and assembly took "<<watch.elapsed()<<std::endl;
-watch.reset();
-        if(criterion.debugLevel()>2) {
-          if(rank==0)
-            std::cout<<"Calculation entries of Galerkin product took "<<watch.elapsed()<<" seconds."<<std::endl;
+        typename MatrixOperator::matrix_type* coarseMatrix;
+        double overflow=criterion.getOverflowFraction();
+        int success;
+
+        for(std::size_t tries=0; tries<3; ++tries)
+        {
+          try
+          {
+            coarseMatrix= new typename MatrixOperator::matrix_type(aggregates,aggregates, avg , overflow ,MatrixOperator::matrix_type::implicit);
+
+            ImplicitMatrixBuilder<typename M::matrix_type> wrapped(*coarseMatrix);
+            productBuilder.calculate(matrix->getmat(), *aggregatesMap, wrapped, *infoLevel, OverlapFlags());
+            compress_stats = coarseMatrix->compress();
+            if(criterion.debugLevel()>2) {
+              if(rank==0)
+                std::cout<<"Calculation entries of Galerkin product took "<<watch.elapsed()<<" seconds."<<std::endl;
+            }
+            success=0;
+            break;
+          }
+          catch(ImplicitModeOverflowExhausted e)
+          {
+            std::cerr<<e.what()<<std::endl;
+            overflow*=2.0;
+            std::cerr<<"Increasing overflow for matrix setup to "<<overflow<<std::endl;
+            delete coarseMatrix;
+            success=1;
+          }
+        }
+        globalsuccess=infoLevel->communicator().sum(success);
+        if(globalsuccess)
+        {
+          // Building the matrix failed on at least one process
+          if(!success){
+            delete coarseMatrix;
+          }
+          break;
         }
 
         BIGINT nonzeros = countNonZeros(*coarseMatrix);
@@ -958,6 +981,10 @@ watch.reset();
 
 
       infoLevel->freeGlobalLookup();
+      // Check success over all processes, i.e. the ones on the final level.
+      globalsuccess = parallelInformation_.finest()->communicator().sum(globalsuccess);
+      if(globalsuccess)
+        return 1;
 
       built_=true;
       AggregatesMap* aggregatesMap=new AggregatesMap(0);
@@ -1010,7 +1037,7 @@ watch.reset();
       assert(matrices_.levels()==redistributes_.size());
       if(hasCoarsest() && rank==0 && criterion.debugLevel()>1)
         std::cout<<"operator complexity: "<<allnonzeros.todouble()/finenonzeros.todouble()<<std::endl;
-
+      return 0;
     }
 
     template<class M, class IS, class A>

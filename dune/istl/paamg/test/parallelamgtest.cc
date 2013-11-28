@@ -216,22 +216,30 @@ int main(int argc, char** argv)
   MPI_Errhandler_create(MPI_err_handler, &handler);
   MPI_Errhandler_set(MPI_COMM_WORLD, handler);
 
-  int N=100;
+  try
+  {
+    int N=100;
 
-  int coarsenTarget=200;
+    int coarsenTarget=200;
 
-  if(argc>1)
-    N = atoi(argv[1]);
+    if(argc>1)
+      N = atoi(argv[1]);
 
-  if(argc>2)
-    coarsenTarget = atoi(argv[2]);
+    if(argc>2)
+      coarsenTarget = atoi(argv[2]);
 
 #ifdef TEST_AGGLO
-  N=UNKNOWNS;
+    N=UNKNOWNS;
 #endif
-  AMGTester<1,1>::test(N, coarsenTarget);
-  //AMGTester<1,5>::test(N, coarsenTarget);
-  //  AMGTester<10,10>::test(N, coarsenTarget);
+    AMGTester<1,1>::test(N, coarsenTarget);
+    //AMGTester<1,5>::test(N, coarsenTarget);
+    //  AMGTester<10,10>::test(N, coarsenTarget);
+  }
+  catch(Dune::Exception e)
+  {
+    std::cerr<<e.what()<<std::endl;
+    MPI_Abort(MPI_COMM_WORLD, 1000);
+  }
 
   MPI_Finalize();
 }

@@ -92,7 +92,7 @@ namespace Dune
        */
       AggregationParameters()
         : maxDistance_(2), minAggregateSize_(4), maxAggregateSize_(6),
-          connectivity_(15), skipiso_(false)
+          connectivity_(15), skipiso_(false), overflow_(.15)
       {}
 
       /**
@@ -217,10 +217,42 @@ namespace Dune
        */
       void setMaxConnectivity(std::size_t connectivity){ connectivity_ = connectivity;}
 
+      /**
+       * @brief Get the overflow fraction.
+       *
+       * In general we assume that the number of nonzeros per row remains constant across
+       * the levels. Still, during aggregation there might occur fill in on coarser levels
+       * and the number of nonzeros might increase. The overflow fraction will make sure
+       * that the matrix on level l+1 can accomodate (1+overflow)*avg*n nonzeros, where
+       * avg is average number of nonzeros per row on level l and n is the number of
+       * rows on level l+1.
+       * @return The overflow fraction.
+       */
+      double getOverflowFraction() const
+      {
+        return overflow_;
+      }
+
+      /**
+       * @brief Set the overflow fraction.
+       *
+       * In general we assume that the number of nonzeros per row remains constant across
+       * the levels. Still, during aggregation there might occur fill in on coarser levels
+       * and the number of nonzeros might increase. The overflow fraction will make sure
+       * that the matrix on level l+1 can accomodate (1+overflow)*avg*n nonzeros, where
+       * avg is average number of nonzeros per row on level l and n is the number of
+       * rows on level l+1.
+       * @param fraction The overflow fraction.
+       */
+      void setOverflowFraction(double fraction)
+      {
+        overflow_=fraction;
+      }
+
     private:
       std::size_t maxDistance_, minAggregateSize_, maxAggregateSize_, connectivity_;
       bool skipiso_;
-
+      double overflow_;
     };
 
 
