@@ -39,7 +39,8 @@ NORMALTESTS = basearraytest \
               scaledidmatrixtest \
               seqmatrixmarkettest \
               solvertest \
-              vbvectortest
+              vbvectortest \
+              threadsoverlappingschwartztest
 
 # list of tests to run (indicestest is special case)
 TESTS = $(NORMALTESTS) $(MPITESTS) $(SUPERLUTESTS) $(PARDISOTEST) $(PARMETISTESTS) $(UMFPACKTEST)
@@ -135,6 +136,14 @@ inverseoperator2prectest_SOURCES = inverseoperator2prectest.cc
 scaledidmatrixtest_SOURCES = scaledidmatrixtest.cc
 
 solvertest_SOURCES = solvertest.cc
+
+threadsoverlappingschwartztest_SOURCES = threadsoverlappingschwartztest.cc
+threadsoverlappingschwartztest_CPPFLAGS = $(AM_CPPFLAGS)      \
+                                          $(DUNEMPICPPFLAGS)
+threadsoverlappingschwartztest_LDFLAGS = $(AM_LDFLAGS)        \
+                                         $(DUNEMPILDFLAGS)
+threadsoverlappingschwartztest_LDADD =  $(DUNEMPILIBS) \
+                                        $(LDADD)
 
 if MPI
   vectorcommtest_SOURCES = vectorcommtest.cc
