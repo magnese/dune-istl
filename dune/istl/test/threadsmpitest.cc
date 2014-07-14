@@ -100,6 +100,32 @@ void push(size_t tid,M& A_thr,V& b_thr,M& A,V& b){
 
 }
 
+// communication policy: copy
+template<typename T>
+class CopyData{
+
+public:
+
+  typedef typename T::value_type IndexedType;
+
+  static IndexedType gather(const T& v,int i){return v[i];}
+  static void scatter(T& v,IndexedType item,int i){v[i]=item;}
+
+};
+
+// communication  policy: add
+template<typename T>
+class AddData{
+
+public:
+
+  typedef typename T::value_type IndexedType;
+
+  static IndexedType gather(const T& v,int i){return v[i];}
+  static void scatter(T& v,IndexedType item,int i){v[i]+=item;}
+
+};
+
 // some printing routines for debugging
 // parallel sync print of a value for all the processes
 template<typename T,typename C>
@@ -201,7 +227,7 @@ int main(int argc,char** argv){
   pis.beginResize();
   for(size_t i=firstGlobalIdx;i!=(lastGlobalIdx-1);++i) pis.add(i,LocalIndexType(i-firstGlobalIdx,owner));
   if(rank!=(size-1)) pis.add(lastGlobalIdx,LocalIndexType(lastGlobalIdx-firstGlobalIdx,ghost));
-  else pis.add(lastGlobalIdx,LocalIndexType(lastGlobalIdx-firstGlobalIdx,owner));
+  else pis.add(lastGlobalIdx,LocalIndexType(lastGlobalIdx-firstGlobalIdx,ghost));
   pis.endResize();
 
   printAll("Parallel index set",pis,comm);
@@ -269,6 +295,33 @@ int main(int argc,char** argv){
     for(size_t j=0;j!=colors[i].size();++j) thr[j]=std::thread(push<StiffnessMatrixType,VectorType>,colors[i][j],std::ref(A_thr[i]),std::ref(b_thr[i]),std::ref(A),std::ref(b));
     for(size_t j=0;j!=colors[i].size();++j) thr[j].join();
   }
+
+  // impose boundary condition
+  if(rank==0){
+    A[0][0]=1;
+    for(size_t i=1;i!=numNodes;++i) A[0][i]=0;
+    b[0]=uExact(std::move(x0[0]));
+  }
+
+  if(rank==(size-1)){
+    A[numNodes-1][numNodes-1]=1;
+    for(size_t i=0;i!=(numNodes-1);++i) A[numNodes-1][i]=0;
+    b[numNodes-1]=uExact(std::move(x1[0]));
+  }
+
+  printAll("b before communication",b,comm);
+  printOne("","",comm);
+
+  // communicate
+  typedef Dune::BufferedCommunicator CommunicatorType;
+  CommunicatorType bComm;
+
+  bComm.build(b,b,interface);
+  bComm.forward<AddData<VectorType>>(b,b);
+  bComm.backward<CopyData<VectorType>>(b,b);
+
+  printAll("b after communication",b,comm);
+  printOne("","",comm);
 
   // finalize MPI
   MPI_Finalize();
