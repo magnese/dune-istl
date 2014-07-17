@@ -14,7 +14,8 @@
 #include <string>
 #include <thread>
 
-#include <dune/common/fvector.hh>
+//#include <dune/common/fvector.hh>
+//#include <dune/common/fmatrix.hh>
 #include <dune/common/dynmatrix.hh>
 #include <dune/common/dynvector.hh>
 #include <dune/common/enumset.hh>
@@ -26,11 +27,11 @@
 #include <dune/common/parallel/interface.hh>
 #include <dune/common/parallel/communicator.hh>
 
-#include <dune/istl/matrixmarket.hh>
-#include <dune/istl/io.hh>
-#include <dune/istl/bvector.hh>
-#include <dune/istl/schwarz.hh>
-#include <dune/istl/owneroverlapcopy.hh>
+//#include <dune/istl/matrixmarket.hh>
+//#include <dune/istl/io.hh>
+//#include <dune/istl/bvector.hh>
+//#include <dune/istl/schwarz.hh>
+//#include <dune/istl/owneroverlapcopy.hh>
 
 // problem definition
 const double x0Global(0.0);
@@ -43,7 +44,7 @@ inline double f(double&& x){return 2.0;}
 #define GRID_ELEMENTS_PER_THREAD 2
 
 //debug flag
-#define DEBUG_THREADS_TEST 1
+#define DEBUG_FLAG 1
 
 // basis functions
 inline double phi0(double&& x){return 1.0-x;}
@@ -132,7 +133,6 @@ public:
 
 };
 
-//TODO: put correct location with offset
 // matrix communication policy: copy
 template<typename T>
 class CopyDataMatrix{
@@ -141,12 +141,11 @@ public:
 
   typedef typename T::value_type IndexedType;
 
-  static IndexedType gather(const T& v,int i){return v[i];}
-  static void scatter(T& v,IndexedType item,int i){v[i]=item;}
+  static IndexedType gather(const T& m,int i){return m[i/m.rows()][i%m.rows()];}
+  static void scatter(T& m,IndexedType item,int i){m[i/m.rows()][i%m.rows()]=item;}
 
 };
 
-//TODO: put corret location with offset
 // matrix communication  policy: add
 template<typename T>
 class AddDataMatrix{
@@ -155,20 +154,19 @@ public:
 
   typedef typename T::value_type IndexedType;
 
-  static IndexedType gather(const T& v,int i){return v[i];}
-  static void scatter(T& v,IndexedType item,int i){v[i]+=item;}
+  static IndexedType gather(const T& m,int i){return m[i/m.rows()][i%m.rows()];}
+  static void scatter(T& m,IndexedType item,int i){m[i/m.rows()][i%m.rows()]+=item;}
 
 };
-
 
 // some printing routines for debugging
 // parallel sync print of a value for all the processes
 template<typename T,typename C>
 void printAll(std::string&& str,T& value,C& comm){
-  #ifdef DEBUG_THREADS_TEST
-  #if DEBUG_THREADS_TEST
+  #ifdef DEBUG_FLAG
+  #if DEBUG_FLAG
   for(size_t i=0;i!=comm.size();++i){
-    if(comm.rank()==i) std::cout<<str<<" (rank "<<comm.rank()<<")\t"<<value<<std::endl;
+    if(comm.rank()==i) std::cout<<"[rank "<<comm.rank()<<"] "<<str<<value<<std::endl;
     comm.barrier();
   }
   #endif
@@ -178,9 +176,9 @@ void printAll(std::string&& str,T& value,C& comm){
 // parallel sync print of a value for only 1 process (default rank=0)
 template<typename T,typename C>
 void printOne(std::string&& str,T& value,C& comm,size_t rank=0){
-  #ifdef DEBUG_THREADS_TEST
-  #if DEBUG_THREADS_TEST
-  if(comm.rank()==rank) std::cout<<str<<"\t"<<value<<std::endl;
+  #ifdef DEBUG_FLAG
+  #if DEBUG_FLAG
+  if(comm.rank()==rank) std::cout<<str<<value<<std::endl;
   comm.barrier();
   #endif
   #endif
@@ -189,11 +187,11 @@ void printOne(std::string&& str,T& value,C& comm,size_t rank=0){
 // parallel sync print of a vector for all the processes
 template<typename T,typename C>
 void printAll(std::string&& str,std::vector<T>& v,C& comm){
-  #ifdef DEBUG_THREADS_TEST
-  #if DEBUG_THREADS_TEST
+  #ifdef DEBUG_FLAG
+  #if DEBUG_FLAG
   for(size_t i=0;i!=comm.size();++i){
     if(comm.rank()==i){
-      std::cout<<str<<" (rank "<<comm.rank()<<")\t";
+      std::cout<<"[rank "<<comm.rank()<<"] "<<str;
       for(typename std::vector<T>::iterator it=v.begin();it!=v.end();++it) std::cout<<*it<<" ";
       std::cout<<std::endl;
     }
@@ -206,10 +204,10 @@ void printAll(std::string&& str,std::vector<T>& v,C& comm){
 // parallel sync print of a vector for only 1 process (default rank=0)
 template<typename T,typename C>
 void printOne(std::string&& str,std::vector<T>& v,C& comm,size_t rank=0){
-  #ifdef DEBUG_THREADS_TEST
-  #if DEBUG_THREADS_TEST
+  #ifdef DEBUG_FLAG
+  #if DEBUG_FLAG
   if(comm.rank()==rank){
-    std::cout<<str<<"\t";
+    std::cout<<str;
     for(typename std::vector<T>::iterator it=v.begin();it!=v.end();++it) std::cout<<*it<<" ";
     std::cout<<std::endl;
   }
@@ -223,9 +221,9 @@ int main(int argc,char** argv){
   // init MPI
   MPI_Init(&argc,&argv);
   Dune::CollectiveCommunication<MPI_Comm> comm(MPI_COMM_WORLD);
-  typedef int GlobalId;
-  typedef Dune::OwnerOverlapCopyCommunication<GlobalId> OverlapCommunicationType;
-  OverlapCommunicationType commOverlap(MPI_COMM_WORLD);
+  //typedef int GlobalId;
+  //typedef Dune::OwnerOverlapCopyCommunication<GlobalId> OverlapCommunicationType;
+  //OverlapCommunicationType commOverlap(MPI_COMM_WORLD);
 
   // get size and rank
   const size_t size(comm.size());
@@ -250,7 +248,7 @@ int main(int argc,char** argv){
   GridType grid(numNodes,x0);
 
   for(size_t i=1;i!=numNodes;++i) grid[i]+=(deltax*i);
-  printAll("Local grid",grid,comm);
+  printAll("Local grid: ",grid,comm);
   printOne("","",comm);
 
   // define parallel local index and parallel index set
@@ -275,7 +273,7 @@ int main(int argc,char** argv){
   vectorPIS.add(vectorLastGlobalIdx,LocalIndexType(vectorLastGlobalIdx-vectorFirstGlobalIdx,flg));
   vectorPIS.endResize();
 
-  printAll("Vector parallel index set",vectorPIS,comm);
+  printAll("Vector parallel index set: ",vectorPIS,comm);
   printOne("","",comm);
 
   //create parallel index set for matrix
@@ -299,7 +297,7 @@ int main(int argc,char** argv){
   }
   matrixPIS.endResize();
 
-  printAll("Matrix parallel index set",matrixPIS,comm);
+  printAll("Matrix parallel index set: ",matrixPIS,comm);
   printOne("","",comm);
 
   // create remote index set for vector
@@ -314,8 +312,8 @@ int main(int argc,char** argv){
 
   // create interface for vector
   Dune::EnumItem<flags,overlap> overlapFlags;
-  Dune::EnumItem<flags,owner> ownerFlags;
-  Dune::EnumItem<flags,border> borderFlags;
+  //Dune::EnumItem<flags,owner> ownerFlags;
+  //Dune::EnumItem<flags,border> borderFlags;
 
   typedef Dune::Interface VectorInterfaceType;
   VectorInterfaceType vectorInterface(MPI_COMM_WORLD);
@@ -334,8 +332,8 @@ int main(int argc,char** argv){
     for(size_t j=0;j!=colors[i].size();++j) colors[i][j]=j*2+1*i;
   }
 
-  printOne("Threads with color 0:",colors[0],comm);
-  printOne("Threads with color 1:",colors[1],comm);
+  printOne("Threads with color 0: ",colors[0],comm);
+  printOne("Threads with color 1: ",colors[1],comm);
   printOne("","",comm);
 
   // allocate stiffness matrix A, RHS vector b and solution vector x
@@ -389,7 +387,10 @@ int main(int argc,char** argv){
     b[numNodes-1]=uExact(std::move(x1[0]));
   }
 
-  printAll("b before communication",b,comm);
+  printAll("A before communication:\n",A,comm);
+  printOne("","",comm);
+
+  printAll("b before communication: ",b,comm);
   printOne("","",comm);
 
   // communicate vector
@@ -400,15 +401,18 @@ int main(int argc,char** argv){
   bComm.forward<AddData<VectorType>>(b,b);
   bComm.backward<CopyData<VectorType>>(b,b);
 
-  printAll("b after communication",b,comm);
-  printOne("","",comm);
-
   // communicate matrix
   CommunicatorType AComm;
 
   AComm.build(A,A,matrixInterface);
   AComm.forward<AddDataMatrix<StiffnessMatrixType>>(A,A);
   AComm.backward<CopyDataMatrix<StiffnessMatrixType>>(A,A);
+
+  printAll("A after communication:\n",A,comm);
+  printOne("","",comm);
+
+  printAll("b after communication: ",b,comm);
+  printOne("","",comm);
 
   // finalize MPI
   MPI_Finalize();
