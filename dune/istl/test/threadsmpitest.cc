@@ -26,6 +26,12 @@
 #include <dune/common/parallel/interface.hh>
 #include <dune/common/parallel/communicator.hh>
 
+#include <dune/istl/matrixmarket.hh>
+#include <dune/istl/io.hh>
+#include <dune/istl/bvector.hh>
+#include <dune/istl/schwarz.hh>
+#include <dune/istl/owneroverlapcopy.hh>
+
 // problem definition
 const double x0Global(0.0);
 const double lengthGrid(0.5);
@@ -100,7 +106,7 @@ void push(size_t tid,M& A_thr,V& b_thr,M& A,V& b){
 
 }
 
-// communication policy: copy
+// vector communication policy: copy
 template<typename T>
 class CopyData{
 
@@ -113,7 +119,7 @@ public:
 
 };
 
-// communication  policy: add
+// vector communication  policy: add
 template<typename T>
 class AddData{
 
@@ -125,6 +131,35 @@ public:
   static void scatter(T& v,IndexedType item,int i){v[i]+=item;}
 
 };
+
+//TODO: put correct location with offset
+// matrix communication policy: copy
+template<typename T>
+class CopyDataMatrix{
+
+public:
+
+  typedef typename T::value_type IndexedType;
+
+  static IndexedType gather(const T& v,int i){return v[i];}
+  static void scatter(T& v,IndexedType item,int i){v[i]=item;}
+
+};
+
+//TODO: put corret location with offset
+// matrix communication  policy: add
+template<typename T>
+class AddDataMatrix{
+
+public:
+
+  typedef typename T::value_type IndexedType;
+
+  static IndexedType gather(const T& v,int i){return v[i];}
+  static void scatter(T& v,IndexedType item,int i){v[i]+=item;}
+
+};
+
 
 // some printing routines for debugging
 // parallel sync print of a value for all the processes
@@ -188,6 +223,9 @@ int main(int argc,char** argv){
   // init MPI
   MPI_Init(&argc,&argv);
   Dune::CollectiveCommunication<MPI_Comm> comm(MPI_COMM_WORLD);
+  typedef int GlobalId;
+  typedef Dune::OwnerOverlapCopyCommunication<GlobalId> OverlapCommunicationType;
+  OverlapCommunicationType commOverlap(MPI_COMM_WORLD);
 
   // get size and rank
   const size_t size(comm.size());
@@ -206,6 +244,7 @@ int main(int argc,char** argv){
 
   // crate grid
   const size_t numNodes(numThreads*numGridElementsPerThread+1);
+  const size_t numNodesGlobal((numNodes-1)*size+1);
   const double deltax(lengthGrid/(numNodes-1));
   typedef std::vector<CoordType> GridType;
   GridType grid(numNodes,x0);
@@ -215,36 +254,77 @@ int main(int argc,char** argv){
   printOne("","",comm);
 
   // define parallel local index and parallel index set
-  enum flags{owner,ghost};
+  enum flags{owner,overlap,border};
   typedef Dune::ParallelLocalIndex<flags> LocalIndexType;
-  typedef Dune::ParallelIndexSet<size_t,LocalIndexType,numNodes> ParallelIndexType;
+  typedef Dune::ParallelIndexSet<size_t,LocalIndexType,numNodes> VectorParallelIndexType;
+  typedef Dune::ParallelIndexSet<size_t,LocalIndexType,numNodes*numNodes> MatrixParallelIndexType;
 
-  // create parallel index set sis
-  ParallelIndexType pis;
-  const size_t firstGlobalIdx((numNodes-1)*rank);
-  const size_t lastGlobalIdx(firstGlobalIdx+numNodes-1);
+  // create parallel index set for vector
+  VectorParallelIndexType vectorPIS;
+  const size_t vectorFirstGlobalIdx((numNodes-1)*rank);
+  const size_t vectorLastGlobalIdx(vectorFirstGlobalIdx+numNodes-1);
+  flags flg;
 
-  pis.beginResize();
-  for(size_t i=firstGlobalIdx;i!=(lastGlobalIdx-1);++i) pis.add(i,LocalIndexType(i-firstGlobalIdx,owner));
-  if(rank!=(size-1)) pis.add(lastGlobalIdx,LocalIndexType(lastGlobalIdx-firstGlobalIdx,ghost));
-  else pis.add(lastGlobalIdx,LocalIndexType(lastGlobalIdx-firstGlobalIdx,ghost));
-  pis.endResize();
+  vectorPIS.beginResize();
+  if(rank==0) flg=border;
+  else flg=overlap;
+  vectorPIS.add(vectorFirstGlobalIdx,LocalIndexType(0,flg));
+  for(size_t i=(vectorFirstGlobalIdx+1);i!=(vectorLastGlobalIdx-1);++i) vectorPIS.add(i,LocalIndexType(i-vectorFirstGlobalIdx,owner));
+  if(rank==(size-1)) flg=border;
+  else flg=overlap;
+  vectorPIS.add(vectorLastGlobalIdx,LocalIndexType(vectorLastGlobalIdx-vectorFirstGlobalIdx,flg));
+  vectorPIS.endResize();
 
-  printAll("Parallel index set",pis,comm);
+  printAll("Vector parallel index set",vectorPIS,comm);
   printOne("","",comm);
 
-  // create remote indicx set ris
-  typedef Dune::RemoteIndices<ParallelIndexType> RemoteIndicesType;
-  RemoteIndicesType ris(pis,pis,MPI_COMM_WORLD);
-  ris.rebuild<true>();
+  //create parallel index set for matrix
+  MatrixParallelIndexType matrixPIS;
+  const size_t matrixGlobalOffset((numNodes-1)*rank);
 
-  // create interface
-  Dune::EnumItem<flags,ghost> ghostFlags;
+  matrixPIS.beginResize();
+  for(size_t i=0;i!=numNodes;++i){
+    for(size_t j=0;j!=numNodes;++j){
+       flg=owner;
+       if(i==0&&j==0){
+         if(rank==0) flg=border;
+         else flg=overlap;
+       }
+       if(i==(numNodes-1)&&j==(numNodes-1)){
+         if(rank==(size-1)) flg=border;
+         else flg=overlap;
+       }
+       matrixPIS.add((i+matrixGlobalOffset)*numNodesGlobal+(j+matrixGlobalOffset),LocalIndexType(i*numNodes+j,flg));
+    }
+  }
+  matrixPIS.endResize();
+
+  printAll("Matrix parallel index set",matrixPIS,comm);
+  printOne("","",comm);
+
+  // create remote index set for vector
+  typedef Dune::RemoteIndices<VectorParallelIndexType> VectorRemoteIndicesType;
+  VectorRemoteIndicesType vectorRIS(vectorPIS,vectorPIS,MPI_COMM_WORLD);
+  vectorRIS.rebuild<true>();
+
+  // create remote index set for matrix
+  typedef Dune::RemoteIndices<MatrixParallelIndexType> MatrixRemoteIndicesType;
+  MatrixRemoteIndicesType matrixRIS(matrixPIS,matrixPIS,MPI_COMM_WORLD);
+  matrixRIS.rebuild<true>();
+
+  // create interface for vector
+  Dune::EnumItem<flags,overlap> overlapFlags;
   Dune::EnumItem<flags,owner> ownerFlags;
+  Dune::EnumItem<flags,border> borderFlags;
 
-  typedef Dune::Interface InterfaceType;
-  InterfaceType interface(MPI_COMM_WORLD);
-  interface.build(ris,ownerFlags,ghostFlags);
+  typedef Dune::Interface VectorInterfaceType;
+  VectorInterfaceType vectorInterface(MPI_COMM_WORLD);
+  vectorInterface.build(vectorRIS,overlapFlags,overlapFlags);
+
+  // create interface for matrix
+  typedef Dune::Interface MatrixInterfaceType;
+  MatrixInterfaceType matrixInterface(MPI_COMM_WORLD);
+  matrixInterface.build(matrixRIS,overlapFlags,overlapFlags);
 
   // set color (each row contains all the thread with the same color)
   size_t numColors(2); // 0 when tid is even, 1 when tid is odd
@@ -312,16 +392,23 @@ int main(int argc,char** argv){
   printAll("b before communication",b,comm);
   printOne("","",comm);
 
-  // communicate
+  // communicate vector
   typedef Dune::BufferedCommunicator CommunicatorType;
   CommunicatorType bComm;
 
-  bComm.build(b,b,interface);
+  bComm.build(b,b,vectorInterface);
   bComm.forward<AddData<VectorType>>(b,b);
   bComm.backward<CopyData<VectorType>>(b,b);
 
   printAll("b after communication",b,comm);
   printOne("","",comm);
+
+  // communicate matrix
+  CommunicatorType AComm;
+
+  AComm.build(A,A,matrixInterface);
+  AComm.forward<AddDataMatrix<StiffnessMatrixType>>(A,A);
+  AComm.backward<CopyDataMatrix<StiffnessMatrixType>>(A,A);
 
   // finalize MPI
   MPI_Finalize();
