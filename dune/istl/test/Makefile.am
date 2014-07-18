@@ -40,7 +40,8 @@ NORMALTESTS = basearraytest \
               seqmatrixmarkettest \
               solvertest \
               vbvectortest \
-              threadsmpitest
+              threadsmpitest \
+              simpleoverlaptest
 
 # list of tests to run (indicestest is special case)
 TESTS = $(NORMALTESTS) $(MPITESTS) $(SUPERLUTESTS) $(PARDISOTEST) $(PARMETISTESTS) $(UMFPACKTEST)
@@ -144,6 +145,14 @@ threadsmpitest_LDFLAGS = $(AM_LDFLAGS) \
                          $(DUNEMPILDFLAGS)
 threadsmpitest_LDADD =  $(DUNEMPILIBS) \
                         $(LDADD)
+
+simpleoverlaptest_SOURCES = simpleoverlaptest.cc
+simpleoverlaptest_CPPFLAGS = $(AM_CPPFLAGS) \
+                             $(DUNEMPICPPFLAGS)
+simpleoverlaptest_LDFLAGS = $(AM_LDFLAGS) \
+                            $(DUNEMPILDFLAGS)
+simpleoverlaptest_LDADD =  $(DUNEMPILIBS) \
+                           $(LDADD)
 
 if MPI
   vectorcommtest_SOURCES = vectorcommtest.cc
