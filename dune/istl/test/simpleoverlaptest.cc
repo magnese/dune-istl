@@ -98,6 +98,7 @@ void printBMatrix(std::string&& str,M& matrix,C& comm){
         for(size_t col=0;col!=matrix.M();++col){
           if(matrix.exists(row,col)) std::cout<<matrix[row][col];
           else std::cout<<nullmatrix;
+          std::cout<<std::endl;
         }
       }
     }
@@ -185,21 +186,24 @@ int main(int argc,char** argv){
     for(size_t j=0;j!=numBlocks;++j){
       if(A.exists(i,j)){
         Flag flag(AttributeSetType::owner);
-        bool isPublic(false);
+        bool isPublic(true);
         size_t global((i+idxOffset)*numBlocksGlobal+(j+idxOffset));
         if(i==0&&j==0&&rank!=0){
           flag=AttributeSetType::copy;
-          isPublic=true;
+          //isPublic=false;
         }
         if(i==0&&j==(numBlocks-1)&&rank!=0){
           flag=AttributeSetType::overlap;
-          isPublic=true;
+          //isPublic=true;
         }
         indices.add(global,LocalIndexType(i*numBlocks+j,flag,isPublic));
       }
     }
   }
   indices.endResize();
+
+  printAll("Parallel index set\n",indices,commColl);
+  printOne("","",commColl);
 
   commOverlap.remoteIndices().rebuild<false>();
   commOverlap.copyOwnerToAll(x,x);
