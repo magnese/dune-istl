@@ -2,7 +2,6 @@
 #include "config.h"
 #endif
 
-// includes
 #include <iostream>
 #include <vector>
 #include <string>
@@ -23,11 +22,9 @@
 #include <dune/istl/schwarz.hh>
 #include <dune/istl/owneroverlapcopy.hh>
 
-// sizes
 #define BLOCK_DIM 1
-#define NUM_BLOCKS 3
-
 #define DEBUG_FLAG 1
+
 // some printing routines for debugging
 // parallel sync print of a value for all the processes
 template<typename T,typename C>
@@ -118,54 +115,71 @@ int main(int argc,char** argv){
   const size_t size(commColl.size());
   const size_t rank(commColl.rank());
 
+  // check if the code is run on 2 processes
+  if(size!=2){
+    printOne("Error: run the code again with 2 processes!","",commColl);
+    MPI_Finalize();
+    return 1;
+  }
+
   // dimmension
   const size_t blockDim(BLOCK_DIM);
-  const size_t numBlocks(NUM_BLOCKS);
+  const size_t dim(rank+2);
 
   // create vector and matrix
-  typedef double FieldType;
-  FieldType value(rank*numBlocks+1.0);
+  typedef int FieldType;
 
   typedef Dune::FieldMatrix<FieldType,blockDim,blockDim> MatrixBlockType;
   typedef Dune::BCRSMatrix<MatrixBlockType> MatrixType;
-  MatrixType A(numBlocks,numBlocks,MatrixType::random);
+  MatrixType A(dim,dim,MatrixType::random);
 
   typedef Dune::FieldVector<FieldType,blockDim> VectorBlockType;
   typedef Dune::BlockVector<VectorBlockType> VectorType;
-  VectorType x(numBlocks);
+  VectorType x(dim);
+  VectorType y(dim);
 
   // fill vector x
-  for(size_t i=0;i!= x.size();++i){
-    for(size_t j=0;j!=x[i].size();++j) x[i][j]=value;
-    value+=1.0;
+  if(rank==0){
+    x[0]=3;
+  }
+  else{
+    x[0]=2;
+    x[1]=1;
   }
 
-  printAll("x\n",x,commColl);
+  printAll("x before communication\n",x,commColl);
   printOne("","",commColl);
 
   // fill matrix A
-  for(size_t i=0;i!=numBlocks;++i) A.setrowsize(i,1); // each row has 1 block
-  if(rank!=0) A.incrementrowsize(0);
-  A.endrowsizes();
-  for(size_t i=0;i!=numBlocks;++i) A.addindex(i,i); // the block is on the diagonal
-  if(rank!=0) A.addindex(0,numBlocks-1);
-  A.endindices();
-  value=rank*numBlocks+1.0;
-  for(size_t i=0;i!=numBlocks;++i){
-    A[i][i]=value;
-    value+=1.0;
+  if(rank==0){
+    A.setrowsize(0,2);
+    A.setrowsize(1,0);
+    A.endrowsizes();
+    A.addindex(0,0);
+    A.addindex(0,1);
+    A.endindices();
+    A[0][0]=1;
+    A[0][1]=2;
   }
-  if(rank!=0) A[0][numBlocks-1]=value;
+  else{
+    A.setrowsize(0,2);
+    A.setrowsize(1,1);
+    A.setrowsize(2,2);
+    A.endrowsizes();
+    A.addindex(0,1);
+    A.addindex(0,2);
+    A.addindex(1,0);
+    A.addindex(2,1);
+    A.addindex(2,2);
+    A.endindices();
+    A[0][1]=3;
+    A[0][2]=2;
+    A[1][0]=1;
+    A[2][1]=2;
+    A[2][2]=1;
+  }
 
   printBMatrix("A\n",A,commColl);
-  printOne("","",commColl);
-
-  // perform y=Ax localy
-  VectorType y(numBlocks);
-
-  A.mv(x,y);
-
-  printAll("y=Ax\n",y,commColl);
   printOne("","",commColl);
 
   // setup communication
@@ -180,41 +194,40 @@ int main(int argc,char** argv){
   ParallelIndexSetType& indices(commOverlap.indexSet());
 
   indices.beginResize();
-  const size_t numBlocksGlobal((numBlocks-1)*size+1);
-  const size_t idxOffset((numBlocks-1)*rank);
-  for(size_t i=0;i!=numBlocks;++i){
-    for(size_t j=0;j!=numBlocks;++j){
-      if(A.exists(i,j)){
-        Flag flag(AttributeSetType::owner);
-        bool isPublic(true);
-        size_t global((i+idxOffset)*numBlocksGlobal+(j+idxOffset));
-        if(i==0&&j==0&&rank!=0){
-          flag=AttributeSetType::copy;
-          //isPublic=false;
-        }
-        if(i==0&&j==(numBlocks-1)&&rank!=0){
-          flag=AttributeSetType::overlap;
-          //isPublic=true;
-        }
-        indices.add(global,LocalIndexType(i*numBlocks+j,flag,isPublic));
-      }
-    }
+  if(rank==0){
+    indices.add(0,LocalIndexType(0,AttributeSetType::owner,true));
+    indices.add(2,LocalIndexType(1,AttributeSetType::copy,true));
+  }
+  else{
+    indices.add(1,LocalIndexType(0,AttributeSetType::owner,true));
+    indices.add(2,LocalIndexType(1,AttributeSetType::owner,true));
+    indices.add(0,LocalIndexType(2,AttributeSetType::copy,true));
   }
   indices.endResize();
 
   printAll("Parallel index set\n",indices,commColl);
   printOne("","",commColl);
 
+  // remote indices already built
   commOverlap.remoteIndices().rebuild<false>();
+
+  // fill x with the values which need to be copied
   commOverlap.copyOwnerToAll(x,x);
 
   printAll("x after communication\n",x,commColl);
   printOne("","",commColl);
 
+  // perform the product y=Ax
   Dune::OverlappingSchwarzOperator<MatrixType,VectorType,VectorType,OverlapCommunicationType> schwarzOperator(A,commOverlap);
   schwarzOperator.apply(x,y);
 
-  printAll("y=Ax with Schwarz operator\n",y,commColl);
+  printAll("y=Ax using Schwarz operator\n",y,commColl);
+  printOne("","",commColl);
+
+  // fill y with the values which need to be copied
+  commOverlap.copyOwnerToAll(y,y);
+
+  printAll("y after communication\n",y,commColl);
   printOne("","",commColl);
 
   // finalize MPI
