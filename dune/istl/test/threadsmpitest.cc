@@ -7,15 +7,12 @@
 #define WORLDDIM 1
 #define GRIDDIM 1
 
-// includes
 #include <iostream>
 #include <vector>
 #include <functional>
 #include <string>
 #include <thread>
 
-//#include <dune/common/fvector.hh>
-//#include <dune/common/fmatrix.hh>
 #include <dune/common/dynmatrix.hh>
 #include <dune/common/dynvector.hh>
 #include <dune/common/enumset.hh>
@@ -26,12 +23,6 @@
 #include <dune/common/parallel/remoteindices.hh>
 #include <dune/common/parallel/interface.hh>
 #include <dune/common/parallel/communicator.hh>
-
-//#include <dune/istl/matrixmarket.hh>
-//#include <dune/istl/io.hh>
-//#include <dune/istl/bvector.hh>
-//#include <dune/istl/schwarz.hh>
-//#include <dune/istl/owneroverlapcopy.hh>
 
 // problem definition
 const double x0Global(0.0);
@@ -221,9 +212,6 @@ int main(int argc,char** argv){
   // init MPI
   MPI_Init(&argc,&argv);
   Dune::CollectiveCommunication<MPI_Comm> comm(MPI_COMM_WORLD);
-  //typedef int GlobalId;
-  //typedef Dune::OwnerOverlapCopyCommunication<GlobalId> OverlapCommunicationType;
-  //OverlapCommunicationType commOverlap(MPI_COMM_WORLD);
 
   // get size and rank
   const size_t size(comm.size());
