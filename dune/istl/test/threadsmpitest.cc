@@ -47,41 +47,41 @@ inline double derphi1(double&& x){return 1.0;}
 template<typename M,typename V,typename G,typename F>
 void assemble(size_t tid,M& A_thr,V& b_thr,G& grid,size_t numGridElements,F& phi,F& derphi){
 
-    std::vector<std::vector<double>> A_entity(2,std::vector<double>(2,0.0));
-    std::vector<double> b_entity(2,0.0);
+  std::vector<std::vector<double>> A_entity(2,std::vector<double>(2,0.0));
+  std::vector<double> b_entity(2,0.0);
 
-    size_t startElem(tid*numGridElements);
-    size_t endElem((tid+1)*numGridElements);
-    for(size_t elem=startElem;elem!=endElem;++elem){
+  const size_t startElem(tid*numGridElements);
+  const size_t endElem((tid+1)*numGridElements);
+  for(size_t elem=startElem;elem!=endElem;++elem){
 
-        // assemble A_enity and b_entity
-        for(size_t i=0;i!=2;++i){
+    // assemble A_enity and b_entity
+    for(size_t i=0;i!=2;++i){
 
-            b_entity[i]=0.0;
-            // using trapezoid rule
-            b_entity[i]+=0.5*(phi[i](0.0)*f(0.0));
-            b_entity[i]+=0.5*(phi[i](1.0)*f(1.0));
-            b_entity[i]*=(grid[elem+1]-grid[elem]);
+      b_entity[i]=0.0;
+      // using trapezoid rule
+      b_entity[i]+=0.5*(phi[i](0.0)*f(0.0));
+      b_entity[i]+=0.5*(phi[i](1.0)*f(1.0));
+      b_entity[i]*=(grid[elem+1]-grid[elem]);
 
-            for(size_t j=0;j!=2;++j){
-                A_entity[i][j]=0.0;
-                // using trapezoid rule
-                A_entity[i][j]+=0.5*(derphi[i](0.0)*derphi[j](0.0));
-                A_entity[i][j]+=0.5*(derphi[i](1.0)*derphi[j](1.0));
-                A_entity[i][j]/=(grid[elem+1]-grid[elem]);
-            }
-
-        }
-
-        // add entity contributions to A_thr and b_thr
-        for(size_t i=0;i!=2;++i){
-            b_thr[elem-startElem+i]+=b_entity[i];
-            for(size_t j=0;j!=2;++j){
-                A_thr[elem-startElem+i][elem-startElem+j]+=A_entity[i][j];
-            }
-        }
+      for(size_t j=0;j!=2;++j){
+        A_entity[i][j]=0.0;
+        // using trapezoid rule
+        A_entity[i][j]+=0.5*(derphi[i](0.0)*derphi[j](0.0));
+        A_entity[i][j]+=0.5*(derphi[i](1.0)*derphi[j](1.0));
+        A_entity[i][j]/=(grid[elem+1]-grid[elem]);
+      }
 
     }
+
+    // add entity contributions to A_thr and b_thr
+    for(size_t i=0;i!=2;++i){
+      b_thr[elem-startElem+i]+=b_entity[i];
+      for(size_t j=0;j!=2;++j){
+        A_thr[elem-startElem+i][elem-startElem+j]+=A_entity[i][j];
+      }
+    }
+
+  }
 
 }
 
@@ -89,8 +89,8 @@ void assemble(size_t tid,M& A_thr,V& b_thr,G& grid,size_t numGridElements,F& phi
 template<typename M,typename V>
 void push(size_t tid,M& A_thr,V& b_thr,M& A,V& b){
 
-  size_t dim(b_thr.size());
-  size_t offset((dim-1)*tid);
+  const size_t dim(b_thr.size());
+  const size_t offset((dim-1)*tid);
   for(size_t i=0;i!=dim;++i){
     b[i+offset]+=b_thr[i];
     for(size_t j=0;j!=dim;++j) A[i+offset][j+offset]+=A_thr[i][j];
@@ -150,7 +150,6 @@ public:
 
 };
 
-// some printing routines for debugging
 // parallel sync print of a value for all the processes
 template<typename T,typename C>
 void printAll(std::string&& str,T& value,C& comm){
@@ -218,7 +217,8 @@ int main(int argc,char** argv){
   const size_t rank(comm.rank());
 
   // local geometry definition
-  typedef Dune::FieldVector<double,WORLDDIM> CoordType;
+  typedef double ctype;
+  typedef Dune::FieldVector<ctype,WORLDDIM> CoordType;
   CoordType x0(x0Global+rank*lengthGrid);
   CoordType x1(x0+lengthGrid);
 
@@ -231,7 +231,7 @@ int main(int argc,char** argv){
   // crate grid
   const size_t numNodes(numThreads*numGridElementsPerThread+1);
   const size_t numNodesGlobal((numNodes-1)*size+1);
-  const double deltax(lengthGrid/(numNodes-1));
+  const ctype deltax(lengthGrid/(numNodes-1));
   typedef std::vector<CoordType> GridType;
   GridType grid(numNodes,x0);
 
@@ -325,10 +325,10 @@ int main(int argc,char** argv){
   printOne("","",comm);
 
   // allocate stiffness matrix A, RHS vector b and solution vector x
-  typedef Dune::DynamicMatrix<double> StiffnessMatrixType;
+  typedef Dune::DynamicMatrix<ctype> StiffnessMatrixType;
   StiffnessMatrixType A(numNodes,numNodes,0.0);
 
-  typedef Dune::DynamicVector<double> VectorType;
+  typedef Dune::DynamicVector<ctype> VectorType;
   VectorType b(numNodes,0.0);
   VectorType x(numNodes,0.0);
 
