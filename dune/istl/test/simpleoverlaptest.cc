@@ -25,7 +25,6 @@
 #define BLOCK_DIM 1
 #define DEBUG_FLAG 1
 
-// some printing routines for debugging
 // parallel sync print of a value for all the processes
 template<typename T,typename C>
 void printAll(std::string&& str,T& value,C& comm){
@@ -232,6 +231,7 @@ int main(int argc,char** argv){
 
   // finalize MPI
   MPI_Finalize();
+
   return 0;
 
 }
