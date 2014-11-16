@@ -20,7 +20,6 @@
 
 #include"colcompmatrix.hh"
 
-
 namespace Dune {
   /**
    * @addtogroup ISTL
@@ -181,35 +180,28 @@ namespace Dune {
    */
   template<typename T, typename A, int n, int m>
   class UMFPack<BCRSMatrix<FieldMatrix<T,n,m>,A > >
-      : public InverseOperator<
-          BlockVector<FieldVector<T,m>,
-              typename A::template rebind<FieldVector<T,m> >::other>,
-          BlockVector<FieldVector<T,n>,
-              typename A::template rebind<FieldVector<T,n> >::other> >
+    : public InverseOperator<BlockVector<FieldVector<T,m>, typename A::template rebind<FieldVector<T,m> >::other>,
+                             BlockVector<FieldVector<T,n>, typename A::template rebind<FieldVector<T,n> >::other> >
   {
     public:
     /** @brief The matrix type. */
     typedef Dune::BCRSMatrix<FieldMatrix<T,n,m>,A> Matrix;
     typedef Dune::BCRSMatrix<FieldMatrix<T,n,m>,A> matrix_type;
-    /** @brief The corresponding SuperLU Matrix type.*/
+    /** @brief The corresponding SuperLU Matrix type. */
     typedef Dune::ColCompMatrix<Matrix> UMFPackMatrix;
     /** @brief Type of an associated initializer class. */
     typedef ColCompMatrixInitializer<BCRSMatrix<FieldMatrix<T,n,m>,A> > MatrixInitializer;
     /** @brief The type of the domain of the solver. */
-    typedef Dune::BlockVector<
-        FieldVector<T,m>,
-        typename A::template rebind<FieldVector<T,m> >::other> domain_type;
+    typedef Dune::BlockVector<FieldVector<T,m>, typename A::template rebind<FieldVector<T,m> >::other> domain_type;
     /** @brief The type of the range of the solver. */
-    typedef Dune::BlockVector<
-        FieldVector<T,n>,
-        typename A::template rebind<FieldVector<T,n> >::other> range_type;
+    typedef Dune::BlockVector<FieldVector<T,n>, typename A::template rebind<FieldVector<T,n> >::other> range_type;
 
     /** @brief Construct a solver object from a BCRSMatrix
      *
      * This computes the matrix decomposition, and may take a long time
      * (and use a lot of memory).
      *
-     *  @param mat_ the matrix to solve for
+     *  @param matrix the matrix to solve for
      *  @param verbose [0..2] set the verbosity level, defaults to 0
      */
     UMFPack(const Matrix& matrix, int verbose=0) : matrixIsLoaded_(false)
@@ -227,7 +219,7 @@ namespace Dune {
      * This computes the matrix decomposition, and may take a long time
      * (and use a lot of memory).
      *
-     * @param mat_ the matrix to solve for
+     * @param matrix the matrix to solve for
      * @param verbose [0..2] set the verbosity level, defaults to 0
      */
     UMFPack(const Matrix& matrix, int verbose, bool) : matrixIsLoaded_(false)
@@ -240,8 +232,7 @@ namespace Dune {
       setMatrix(matrix);
     }
 
-    /** @brief default constructor
-     */
+    /** @brief Default constructor. */
     UMFPack() : matrixIsLoaded_(false), verbose(0)
     {
       //check whether T is a supported type
@@ -251,7 +242,7 @@ namespace Dune {
     }
 
     /** @brief Try loading a decomposition from file and do a decomposition if unsuccessful
-     * @param mat_ the matrix to decompose when no decoposition file found
+     * @param matrix the matrix to decompose when no decoposition file found
      * @param file the decomposition file
      * @param verbose the verbosity level
      *
@@ -260,7 +251,7 @@ namespace Dune {
      * Thus, if you always use this you will only compute the decomposition once (and when you manually
      * deleted the decomposition file).
      */
-    UMFPack(const Matrix& mat_, const char* file, int verbose=0)
+    UMFPack(const Matrix& matrix, const char* file, int verbose=0)
     {
       //check whether T is a supported type
       static_assert((std::is_same<T,double>::value) || (std::is_same<T,std::complex<double> >::value),
@@ -271,7 +262,7 @@ namespace Dune {
       if ((errcode == UMFPACK_ERROR_out_of_memory) || (errcode == UMFPACK_ERROR_file_IO))
       {
         matrixIsLoaded_ = false;
-        setMatrix(mat_);
+        setMatrix(matrix);
         saveDecomposition(file);
       }
       else
@@ -303,15 +294,14 @@ namespace Dune {
       setVerbosity(verbose);
     }
 
+    /** @brief Destructor. */
     virtual ~UMFPack()
     {
       if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || (matrixIsLoaded_))
         free();
     }
 
-    /**
-     *  \copydoc InverseOperator::apply(X&, Y&, InverseOperatorResult&)
-     */
+    /** \copydoc InverseOperator::apply(X&, Y&, InverseOperatorResult&) */
     virtual void apply(domain_type& x, range_type& b, InverseOperatorResult& res)
     {
       double UMF_Apply_Info[UMFPACK_INFO];
@@ -325,7 +315,7 @@ namespace Dune {
                     UMF_Control,
                     UMF_Apply_Info);
 
-      //this is a direct solver
+      // this is a direct solver
       res.iterations = 1;
       res.converged = true;
       res.elapsed = UMF_Apply_Info[UMFPACK_SOLVE_WALLTIME];
@@ -333,17 +323,15 @@ namespace Dune {
       printOnApply(UMF_Apply_Info);
     }
 
-    /**
-     *  \copydoc InverseOperator::apply(X&,Y&,double,InverseOperatorResult&)
-     */
-    virtual void apply (domain_type& x, range_type& b, double reduction, InverseOperatorResult& res)
+    /** \copydoc InverseOperator::apply(X&,Y&,double,InverseOperatorResult&) */
+    virtual void apply(domain_type& x, range_type& b, double reduction, InverseOperatorResult& res)
     {
       DUNE_UNUSED_PARAMETER(reduction);
       apply(x,b,res);
     }
 
     /**
-     * @brief additional apply method with c-arrays in analogy to superlu
+     * @brief Additional apply method with c-arrays in analogy to superlu.
      * @param x solution array
      * @param b rhs array
      */
@@ -381,7 +369,8 @@ namespace Dune {
       UMF_Control[option] = value;
     }
 
-    /** @brief saves a decomposition to a file
+    /**
+     * @brief Saves a decomposition to a file.
      * @param file the filename to save to
      */
     void saveDecomposition(const char* file)
@@ -401,15 +390,15 @@ namespace Dune {
     }
 
     template<class S>
-    void setSubMatrix(const Matrix& _mat, const S& rowIndexSet)
+    void setSubMatrix(const Matrix& matrix, const S& rowIndexSet)
     {
       if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || (matrixIsLoaded_))
         free();
-      umfpackMatrix_.setMatrix(_mat,rowIndexSet);
+      umfpackMatrix_.setMatrix(matrix,rowIndexSet);
       decompose();
     }
 
-    /** @brief sets the verbosity level for the UMFPack solver
+    /** @brief Sets the verbosity level for the UMFPack solver.
      * @param v verbosity level
      * The following levels are implemented:
      * 0 - only error messages
@@ -429,8 +418,8 @@ namespace Dune {
     }
 
     /**
-     * @brief free allocated space.
-     * @warning later calling apply will result in an error.
+     * @brief Free allocated space.
+     * @warning Later calling apply will result in an error.
      */
     void free()
     {
@@ -443,7 +432,10 @@ namespace Dune {
       matrixIsLoaded_ = false;
     }
 
-    const char* name() { return "UMFPACK"; }
+    inline const char* name()
+    {
+      return "UMFPACK";
+    }
 
     private:
     typedef typename Dune::UMFPackMethodChooser<T> Caller;
@@ -452,7 +444,7 @@ namespace Dune {
     friend class SeqOverlappingSchwarz;
     friend struct SeqOverlappingSchwarzAssemblerHelper<UMFPack<Matrix>,true>;
 
-    /** @brief computes the LU Decomposition */
+    /** @brief Computes the LU decomposition. */
     void decompose()
     {
       double UMF_Decomposition_Info[UMFPACK_INFO];
@@ -500,7 +492,10 @@ namespace Dune {
       }
     }
 
-    UMFPackMatrix& getInternalMatrix() { return umfpackMatrix_; }
+    inline UMFPackMatrix& getInternalMatrix()
+    {
+      return umfpackMatrix_;
+    }
 
     UMFPackMatrix umfpackMatrix_;
     bool matrixIsLoaded_;
@@ -513,13 +508,13 @@ namespace Dune {
   template<typename T, typename A, int n, int m>
   struct IsDirectSolver<UMFPack<BCRSMatrix<FieldMatrix<T,n,m>,A> > >
   {
-    enum { value=true};
+    enum {value = true};
   };
 
   template<typename T, typename A, int n, int m>
   struct StoresColumnCompressed<UMFPack<BCRSMatrix<FieldMatrix<T,n,m>,A> > >
   {
-    enum { value = true };
+    enum {value = true};
   };
 }
 
