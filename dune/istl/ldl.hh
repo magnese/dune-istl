@@ -6,7 +6,6 @@
 #if HAVE_LDL || defined DOXYGEN
 
 #include <iostream>
-#include<complex>
 #include<type_traits>
 
 #ifdef __cplusplus
