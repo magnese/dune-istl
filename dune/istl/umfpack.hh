@@ -390,7 +390,7 @@ namespace Dune {
     /** @brief Initialize data from given matrix. */
     void setMatrix(const Matrix& matrix)
     {
-      if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || (matrixIsLoaded_))
+      if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || matrixIsLoaded_)
         free();
       umfpackMatrix_ = matrix;
       decompose();
@@ -399,7 +399,7 @@ namespace Dune {
     template<class S>
     void setSubMatrix(const Matrix& matrix, const S& rowIndexSet)
     {
-      if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || (matrixIsLoaded_))
+      if ((umfpackMatrix_.N() + umfpackMatrix_.M() > 0) || matrixIsLoaded_)
         free();
       umfpackMatrix_.setMatrix(matrix,rowIndexSet);
       decompose();
