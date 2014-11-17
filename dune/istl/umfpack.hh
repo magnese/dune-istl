@@ -39,7 +39,8 @@ namespace Dune {
   template<class T, bool tag>
   struct SeqOverlappingSchwarzAssemblerHelper;
 
-  /** @brief Use the %UMFPack package to directly solve linear systems -- empty default class
+  /**
+   * @brief Use the %UMFPack package to directly solve linear systems -- empty default class
    * @tparam Matrix the matrix type defining the system
    * Details on UMFPack can be found on
    * http://www.cise.ufl.edu/research/sparse/umfpack/
@@ -165,7 +166,8 @@ namespace Dune {
     }
   };
 
-  /** @brief The %UMFPack direct sparse solver for matrices of type BCRSMatrix
+  /**
+   * @brief The %UMFPack direct sparse solver for matrices of type BCRSMatrix
    *
    * Specialization for the Dune::BCRSMatrix. %UMFPack will always go double
    * precision and supports complex numbers
@@ -196,13 +198,14 @@ namespace Dune {
     /** @brief The type of the range of the solver. */
     typedef Dune::BlockVector<FieldVector<T,n>, typename A::template rebind<FieldVector<T,n> >::other> range_type;
 
-    /** @brief Construct a solver object from a BCRSMatrix
+    /**
+     * @brief Construct a solver object from a BCRSMatrix.
      *
      * This computes the matrix decomposition, and may take a long time
      * (and use a lot of memory).
      *
-     *  @param matrix the matrix to solve for
-     *  @param verbose [0..2] set the verbosity level, defaults to 0
+     * @param matrix the matrix to solve for
+     * @param verbose [0..2] set the verbosity level, defaults to 0
      */
     UMFPack(const Matrix& matrix, int verbose=0) : matrixIsLoaded_(false)
     {
@@ -214,7 +217,8 @@ namespace Dune {
       setMatrix(matrix);
     }
 
-    /** @brief Constructor for compatibility with SuperLU standard constructor
+    /**
+     * @brief Constructor for compatibility with SuperLU standard constructor
      *
      * This computes the matrix decomposition, and may take a long time
      * (and use a lot of memory).
@@ -241,7 +245,8 @@ namespace Dune {
       Caller::defaults(UMF_Control);
     }
 
-    /** @brief Try loading a decomposition from file and do a decomposition if unsuccessful
+    /**
+     * @brief Try loading a decomposition from file and do a decomposition if unsuccessful
      * @param matrix the matrix to decompose when no decoposition file found
      * @param file the decomposition file
      * @param verbose the verbosity level
@@ -272,7 +277,8 @@ namespace Dune {
       }
     }
 
-    /** @brief try loading a decomposition from file
+    /**
+     * @brief try loading a decomposition from file
      * @param file the decomposition file
      * @param verbose the verbosity level
      * @throws Dune::Exception When not being able to load the file. Does not need knowledge of the
@@ -350,7 +356,8 @@ namespace Dune {
       printOnApply(UMF_Apply_Info);
     }
 
-    /** @brief Set UMFPack-specific options
+    /**
+     * @brief Set UMFPack-specific options
      *
      * This method allows to set various options that control the UMFPack solver.
      * More specifically, it allows to set values in the UMF_Control array.
@@ -398,7 +405,8 @@ namespace Dune {
       decompose();
     }
 
-    /** @brief Sets the verbosity level for the UMFPack solver.
+    /**
+     * @brief Sets the verbosity level for the UMFPack solver.
      * @param v verbosity level
      * The following levels are implemented:
      * 0 - only error messages
@@ -415,6 +423,15 @@ namespace Dune {
         UMF_Control[UMFPACK_PRL] = 2;
       if (verbose == 2)
         UMF_Control[UMFPACK_PRL] = 4;
+    }
+
+    /**
+     * @brief Return the matrix factorization.
+     * @warning It is up to the user to keep consistency.
+     **/
+    inline void* getFactorization()
+    {
+      return UMF_Numeric;
     }
 
     /**
