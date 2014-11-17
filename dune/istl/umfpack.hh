@@ -428,10 +428,19 @@ namespace Dune {
     /**
      * @brief Return the matrix factorization.
      * @warning It is up to the user to keep consistency.
-     **/
+     */
     inline void* getFactorization()
     {
       return UMF_Numeric;
+    }
+
+    /**
+     * @brief Return the column compress matrix.
+     * @warning It is up to the user to keep consistency.
+     */
+    inline UMFPackMatrix& getInternalMatrix()
+    {
+      return umfpackMatrix_;
     }
 
     /**
@@ -507,11 +516,6 @@ namespace Dune {
         std::cout << "Iterative Refinement steps taken: " << UMF_Info[UMFPACK_IR_TAKEN] << std::endl;
         std::cout << "Error Estimate: " << UMF_Info[UMFPACK_OMEGA1] << " resp. " << UMF_Info[UMFPACK_OMEGA2] << std::endl;
       }
-    }
-
-    inline UMFPackMatrix& getInternalMatrix()
-    {
-      return umfpackMatrix_;
     }
 
     UMFPackMatrix umfpackMatrix_;
