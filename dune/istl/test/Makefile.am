@@ -1,5 +1,3 @@
-# $Id$
-
 if MPI
   MPITESTS = vectorcommtest matrixmarkettest
 endif
@@ -22,6 +20,7 @@ endif
 
 # which tests where program to build and run are equal
 NORMALTESTS = basearraytest \
+              bcrsassigntest \
               bcrsbuildtest \
               bcrsimplicitbuildtest \
               bvectortest \
@@ -101,6 +100,8 @@ if PARDISO
 endif
 
 basearraytest_SOURCES = basearraytest.cc
+
+bcrsassigntest_SOURCES = bcrsassigntest.cc
 
 bcrsbuildtest_SOURCES = bcrsbuild.cc
 
