@@ -36,7 +36,7 @@ if ((SUPERLU_FOUND) OR (UMFPACK_FOUND))
 endif()
 
 if(HAVE_MPI)
-  set(MPITESTS vectorcommtest matrixmarkettest matrixredisttest simpleoverlaptest)
+  set(MPITESTS vectorcommtest matrixmarkettest matrixredisttest femthreadsmpitest simpleoverlaptest)
 endif(HAVE_MPI)
 
 set(ALLTESTS ${MPITESTS} ${NORMALTEST} ${PARDISOTEST} ${SUPERLUTESTS} ${UMFPACKTESTS} ${OVLPSCHWARZTESTS})
@@ -114,6 +114,7 @@ endif()
 
 if(HAVE_MPI)
   add_executable(matrixredisttest "matrixredisttest.cc")
+  add_executable(femthreadsmpitest "femthreadsmpitest.cc")
   add_executable(simpleoverlaptest "simpleoverlaptest.cc")
   add_executable(vectorcommtest "vectorcommtest.cc")
   add_executable(matrixmarkettest "matrixmarkettest.cc")

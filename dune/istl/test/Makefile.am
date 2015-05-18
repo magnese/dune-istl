@@ -39,7 +39,7 @@ NORMALTESTS = basearraytest \
               seqmatrixmarkettest \
               solvertest \
               vbvectortest \
-              threadsmpitest \
+              femthreadsmpitest \
               simpleoverlaptest
 
 # list of tests to run (indicestest is special case)
@@ -139,13 +139,13 @@ scaledidmatrixtest_SOURCES = scaledidmatrixtest.cc
 
 solvertest_SOURCES = solvertest.cc
 
-threadsmpitest_SOURCES = threadsmpitest.cc
-threadsmpitest_CPPFLAGS = $(AM_CPPFLAGS) \
-                          $(DUNEMPICPPFLAGS)
-threadsmpitest_LDFLAGS = $(AM_LDFLAGS) \
-                         $(DUNEMPILDFLAGS)
-threadsmpitest_LDADD =  $(DUNEMPILIBS) \
-                        $(LDADD)
+femthreadsmpitest_SOURCES = femthreadsmpitest.cc
+femthreadsmpitest_CPPFLAGS = $(AM_CPPFLAGS) \
+                             $(DUNEMPICPPFLAGS)
+femthreadsmpitest_LDFLAGS = $(AM_LDFLAGS) \
+                            $(DUNEMPILDFLAGS)
+femthreadsmpitest_LDADD =  $(DUNEMPILIBS) \
+                           $(LDADD)
 
 simpleoverlaptest_SOURCES = simpleoverlaptest.cc
 simpleoverlaptest_CPPFLAGS = $(AM_CPPFLAGS) \
