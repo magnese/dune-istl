@@ -1031,10 +1031,7 @@ namespace Dune {
       //! return true if column index is in row
       bool contains (size_type j)
       {
-        if (pattern.find(j)!=pattern.end())
-          return true;
-        else
-          return false;
+        return pattern.find(j) != pattern.end();
       }
       /**
        * @brief Get the current row size.
@@ -1518,9 +1515,9 @@ namespace Dune {
       return *this;
     }
 
-    /*! \brief Substract the entries of another matrix to this one.
+    /*! \brief Subtract the entries of another matrix from this one.
      *
-     * \param b The matrix to add to this one. Its sparsity pattern
+     * \param b The matrix to subtract from this one. Its sparsity pattern
      * has to be subset of the sparsity pattern of this matrix.
      */
     BCRSMatrix& operator-= (const BCRSMatrix& b)
@@ -1891,7 +1888,7 @@ namespace Dune {
     }
 
 
-  private:
+  protected:
     // state information
     BuildMode build_mode;     // row wise or whole matrix
     BuildStage ready;               // indicate the stage the matrix building is in
