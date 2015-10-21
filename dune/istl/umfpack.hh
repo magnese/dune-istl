@@ -310,6 +310,11 @@ namespace Dune {
     /** \copydoc InverseOperator::apply(X&, Y&, InverseOperatorResult&) */
     virtual void apply(domain_type& x, range_type& b, InverseOperatorResult& res)
     {
+      if (umfpackMatrix_.N() != b.size())
+        DUNE_THROW(Dune::ISTLError, "Size of right-hand-side vector b does not match the number of matrix rows!");
+      if (umfpackMatrix_.M() != x.size())
+        DUNE_THROW(Dune::ISTLError, "Size of solution vector x does not match the number of matrix columns!");
+
       double UMF_Apply_Info[UMFPACK_INFO];
       Caller::solve(UMFPACK_A,
                     umfpackMatrix_.getColStart(),

@@ -113,7 +113,7 @@ namespace Dune
 
     }
 
-    static void destroy(SuperMatrix *m)
+    static void destroy(SuperMatrix*)
     {}
 
   };
@@ -194,7 +194,7 @@ namespace Dune
 
     }
 
-    static void destroy(SuperMatrix *mat)
+    static void destroy(SuperMatrix*)
     {}
   };
 
@@ -234,7 +234,7 @@ namespace Dune
 
     }
 
-    static void destroy(SuperMatrix *mat)
+    static void destroy(SuperMatrix* /* mat */)
     {}
   };
 
@@ -561,6 +561,10 @@ namespace Dune
   void SuperLU<BCRSMatrix<FieldMatrix<T,n,m>,A> >
   ::apply(domain_type& x, range_type& b, InverseOperatorResult& res)
   {
+    if (mat.N() != b.size())
+      DUNE_THROW(ISTLError, "Size of right-hand-side vector b does not match the number of matrix rows!");
+    if (mat.M() != x.size())
+      DUNE_THROW(ISTLError, "Size of solution vector x does not match the number of matrix columns!");
     if(mat.M()+mat.N()==0)
       DUNE_THROW(ISTLError, "Matrix of SuperLU is null!");
 
