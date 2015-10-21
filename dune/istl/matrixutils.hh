@@ -116,22 +116,20 @@ namespace Dune
     }
   };
 
-  template<typename T1, typename T2, typename T3, typename T4, typename T5,
-      typename T6, typename T7, typename T8, typename T9>
+  template<typename FirstRow, typename... Args>
   class MultiTypeBlockMatrix;
 
-  template<typename T1, typename T2, typename T3, typename T4, typename T5,
-      typename T6, typename T7, typename T8, typename T9, std::size_t blocklevel, std::size_t l>
-  struct CheckIfDiagonalPresent<MultiTypeBlockMatrix<T1,T2,T3,T4,T5,T6,T7,T8,T9>,
+  template<std::size_t blocklevel, std::size_t l, typename T1, typename... Args>
+  struct CheckIfDiagonalPresent<MultiTypeBlockMatrix<T1,Args...>,
       blocklevel,l>
   {
-    typedef MultiTypeBlockMatrix<T1,T2,T3,T4,T5,T6,T7,T8,T9> Matrix;
+    typedef MultiTypeBlockMatrix<T1,Args...> Matrix;
 
     /**
      * @brief Check whether the a matrix has diagonal values
      * on blocklevel recursion levels.
      */
-    static void check(const Matrix& mat)
+    static void check(const Matrix& /* mat */)
     {
 #ifdef DUNE_ISTL_WITH_CHECKING
       // TODO Implement check
