@@ -166,54 +166,6 @@ namespace Dune {
       return cols_;
     }
 
-    /** \brief The number of scalar rows */
-    size_type rowdim() const {
-#ifdef DUNE_ISTL_WITH_CHECKING
-      if (M()==0)
-        DUNE_THROW(ISTLError, "Can't compute rowdim() when there are no columns!");
-#endif
-      size_type dim = 0;
-      for (size_type i=0; i<data_.N(); i++)
-        dim += data_[i][0].rowdim();
-
-      return dim;
-    }
-
-    /** \brief The number of scalar columns */
-    size_type coldim() const {
-#ifdef DUNE_ISTL_WITH_CHECKING
-      if (N()==0)
-        DUNE_THROW(ISTLError, "Can't compute coldim() when there are no rows!");
-#endif
-      size_type dim = 0;
-      for (size_type i=0; i<data_[0].size(); i++)
-        dim += data_[0][i].coldim();
-
-      return dim;
-    }
-
-    /** \brief The number of scalar rows */
-    size_type rowdim(size_type r) const {
-#ifdef DUNE_ISTL_WITH_CHECKING
-      if (r<0 || r>=N())
-        DUNE_THROW(ISTLError, "Rowdim for nonexisting row " << r << " requested!");
-      if (M()==0)
-        DUNE_THROW(ISTLError, "Can't compute rowdim() when there are no columns!");
-#endif
-      return data_[r][0].rowdim();
-    }
-
-    /** \brief The number of scalar columns */
-    size_type coldim(size_type c) const {
-#ifdef DUNE_ISTL_WITH_CHECKING
-      if (c<0 || c>=M())
-        DUNE_THROW(ISTLError, "Coldim for nonexisting column " << c << " requested!");
-      if (N()==0)
-        DUNE_THROW(ISTLError, "Can't compute coldim() when there are no rows!");
-#endif
-      return data_[0][c].coldim();
-    }
-
     /** \brief Multiplication with a scalar */
     Matrix<T>& operator*=(const field_type& scalar) {
       data_ *= scalar;
@@ -502,29 +454,77 @@ namespace Dune {
     }
 
     //! infinity norm (row sum norm, how to generalize for blocks?)
-    typename FieldTraits<field_type>::real_type infinity_norm () const
-    {
-      double max=0;
-      for (size_type i=0; i<N(); ++i) {
-        double sum=0;
-        for (size_type j=0; j<M(); j++)
-          sum += data_[i][j].infinity_norm();
-        max = std::max(max,sum);
+    template <typename ft = field_type,
+              typename std::enable_if<!has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm() const {
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm();
+        norm = max(sum, norm);
       }
-      return max;
+      return norm;
     }
 
     //! simplified infinity norm (uses Manhattan norm for complex values)
-    typename FieldTraits<field_type>::real_type infinity_norm_real () const
-    {
-      double max=0;
-      for (size_type i=0; i<N(); ++i) {
-        double sum=0;
-        for (size_type j=0; j<M(); j++)
-          sum += data_[i][j].infinity_norm_real();
-        max = std::max(max,sum);
+    template <typename ft = field_type,
+              typename std::enable_if<!has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm_real() const {
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm_real();
+        norm = max(sum, norm);
       }
-      return max;
+      return norm;
+    }
+
+    //! infinity norm (row sum norm, how to generalize for blocks?)
+    template <typename ft = field_type,
+              typename std::enable_if<has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm() const {
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      real_type isNaN = 1;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm();
+        norm = max(sum, norm);
+        isNaN += sum;
+      }
+      isNaN /= isNaN;
+      return norm * isNaN;
+    }
+
+    //! simplified infinity norm (uses Manhattan norm for complex values)
+    template <typename ft = field_type,
+              typename std::enable_if<has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm_real() const {
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      real_type isNaN = 1;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm_real();
+        norm = max(sum, norm);
+        isNaN += sum;
+      }
+      isNaN /= isNaN;
+      return norm * isNaN;
     }
 
     //===== query

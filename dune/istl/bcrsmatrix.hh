@@ -279,7 +279,7 @@ namespace Dune {
 
      For general finite element implementations the number of rows n
      is known, the number of non-zeroes might also be known (e.g.
-     \#edges + \#nodes for P1) but the size of a row and the indices of a row
+     \#edges + \#nodes for P2) but the size of a row and the indices of a row
      can not be defined in sequential order.
 
      \code
@@ -297,7 +297,7 @@ namespace Dune {
      B.setrowsize(2,1);
      B.setrowsize(1,1);
      // increase row size for row 2
-     B.incrementrowsize(2)
+     B.incrementrowsize(2);
 
      // finalize row setup phase
      B.endrowsizes();
@@ -528,7 +528,7 @@ namespace Dune {
 
     public:
       //! \brief The unqualified value type
-      typedef typename remove_const<T>::type ValueType;
+      typedef typename std::remove_const<T>::type ValueType;
 
       friend class RandomAccessIteratorFacade<RealRowIterator<const ValueType>, const ValueType>;
       friend class RandomAccessIteratorFacade<RealRowIterator<ValueType>, ValueType>;
@@ -973,7 +973,7 @@ namespace Dune {
           }
         }else
           // setup empty row
-          Mat.r[i].set(0,0,0);
+          Mat.r[i].set(0,nullptr,nullptr);
 
         // initialize the j array for row i from pattern
         size_type k=0;
@@ -1623,8 +1623,8 @@ namespace Dune {
     }
 
     //! y += alpha A x
-    template<class X, class Y>
-    void usmv (const field_type& alpha, const X& x, Y& y) const
+    template<typename F, class X, class Y>
+    void usmv (F&& alpha, const X& x, Y& y) const
     {
 #ifdef DUNE_ISTL_WITH_CHECKING
       if (ready != built)
@@ -1799,45 +1799,90 @@ namespace Dune {
     }
 
     //! infinity norm (row sum norm, how to generalize for blocks?)
-    typename FieldTraits<field_type>::real_type infinity_norm () const
-    {
+    template <typename ft = field_type,
+              typename std::enable_if<!has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm() const {
       if (ready != built)
         DUNE_THROW(BCRSMatrixError,"You can only call arithmetic operations on fully built BCRSMatrix instances");
 
-      double max=0;
-      ConstRowIterator endi=end();
-      for (ConstRowIterator i=begin(); i!=endi; ++i)
-      {
-        double sum=0;
-        ConstColIterator endj = (*i).end();
-        for (ConstColIterator j=(*i).begin(); j!=endj; ++j)
-          sum += (*j).infinity_norm();
-        max = std::max(max,sum);
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm();
+        norm = max(sum, norm);
       }
-      return max;
+      return norm;
     }
 
     //! simplified infinity norm (uses Manhattan norm for complex values)
-    typename FieldTraits<field_type>::real_type infinity_norm_real () const
-    {
-#ifdef DUNE_ISTL_WITH_CHECKING
+    template <typename ft = field_type,
+              typename std::enable_if<!has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm_real() const {
       if (ready != built)
         DUNE_THROW(BCRSMatrixError,"You can only call arithmetic operations on fully built BCRSMatrix instances");
-#endif
 
-      double max=0;
-      ConstRowIterator endi=end();
-      for (ConstRowIterator i=begin(); i!=endi; ++i)
-      {
-        double sum=0;
-        ConstColIterator endj = (*i).end();
-        for (ConstColIterator j=(*i).begin(); j!=endj; ++j)
-          sum += (*j).infinity_norm_real();
-        max = std::max(max,sum);
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm_real();
+        norm = max(sum, norm);
       }
-      return max;
+      return norm;
     }
 
+    //! infinity norm (row sum norm, how to generalize for blocks?)
+    template <typename ft = field_type,
+              typename std::enable_if<has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm() const {
+      if (ready != built)
+        DUNE_THROW(BCRSMatrixError,"You can only call arithmetic operations on fully built BCRSMatrix instances");
+
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      real_type isNaN = 1;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm();
+        norm = max(sum, norm);
+        isNaN += sum;
+      }
+      isNaN /= isNaN;
+      return norm * isNaN;
+    }
+
+    //! simplified infinity norm (uses Manhattan norm for complex values)
+    template <typename ft = field_type,
+              typename std::enable_if<has_nan<ft>::value, int>::type = 0>
+    typename FieldTraits<ft>::real_type infinity_norm_real() const {
+      if (ready != built)
+        DUNE_THROW(BCRSMatrixError,"You can only call arithmetic operations on fully built BCRSMatrix instances");
+
+      using real_type = typename FieldTraits<ft>::real_type;
+      using std::max;
+
+      real_type norm = 0;
+      real_type isNaN = 1;
+      for (auto const &x : *this) {
+        real_type sum = 0;
+        for (auto const &y : x)
+          sum += y.infinity_norm_real();
+        norm = max(sum, norm);
+        isNaN += sum;
+      }
+      isNaN /= isNaN;
+      return norm * isNaN;
+    }
 
     //===== sizes
 
@@ -1880,10 +1925,7 @@ namespace Dune {
       if (i<0 || i>=n) DUNE_THROW(BCRSMatrixError,"row index out of range");
       if (j<0 || j>=m) DUNE_THROW(BCRSMatrixError,"column index out of range");
 #endif
-      if (r[i].size() && r[i].find(j)!=r[i].end())
-        return true;
-      else
-        return false;
+      return (r[i].size() && r[i].find(j) != r[i].end());
     }
 
 
@@ -1937,7 +1979,7 @@ namespace Dune {
           current_row.setindexptr(current_row.getindexptr()+s);
         } else{
           // empty row
-          r[i].set(0,0,0);
+          r[i].set(0,nullptr,nullptr);
         }
       }
     }
@@ -1960,7 +2002,7 @@ namespace Dune {
           r[i].setindexptr(jptr);
         } else{
           // empty row
-          r[i].set(0,0,0);
+          r[i].set(0,nullptr,nullptr);
         }
 
         // advance position in global array
@@ -1983,7 +2025,7 @@ namespace Dune {
           r[i].setptr(aptr);
         } else{
           // empty row
-          r[i].set(0,0,0);
+          r[i].set(0,nullptr,nullptr);
         }
 
         // advance position in global array

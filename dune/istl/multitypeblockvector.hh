@@ -9,7 +9,6 @@
 
 #include <dune/common/dotproduct.hh>
 #include <dune/common/ftraits.hh>
-#include <dune/common/std/constexpr.hh>
 
 #include "istlexception.hh"
 
@@ -228,6 +227,69 @@ namespace Dune {
     static real_type result (const T&) {return 0.0;}
   };
 
+  /** \brief Calculate the \infty-norm
+
+     Each element of the vector has to provide the method "infinity_norm()"
+     in order to calculate the whole vector's norm.
+   */
+  template<int count, typename T,
+           bool hasNaN = has_nan<typename T::field_type>::value>
+  class MultiTypeBlockVector_InfinityNorm {
+  public:
+    typedef typename T::field_type field_type;
+    typedef typename FieldTraits<field_type>::real_type real_type;
+
+    /**
+     * Take the maximum over all elements' norms
+     */
+    static real_type result (const T& a)
+    {
+      std::pair<real_type, real_type> const ret = resultHelper(a);
+      return ret.first * (ret.second / ret.second);
+    }
+
+    // Computes the maximum while keeping track of NaN values
+    static std::pair<real_type, real_type> resultHelper(const T& a) {
+      using std::max;
+      auto const rest =
+          MultiTypeBlockVector_InfinityNorm<count - 1, T>::resultHelper(a);
+      real_type const norm = std::get<count - 1>(a).infinity_norm();
+      return {max(norm, rest.first), norm + rest.second};
+    }
+  };
+
+  template <int count, typename T>
+  class MultiTypeBlockVector_InfinityNorm<count, T, false> {
+  public:
+    typedef typename T::field_type field_type;
+    typedef typename FieldTraits<field_type>::real_type real_type;
+
+    /**
+     * Take the maximum over all elements' norms
+     */
+    static real_type result (const T& a)
+    {
+      using std::max;
+      return max(std::get<count-1>(a).infinity_norm(), MultiTypeBlockVector_InfinityNorm<count-1,T>::result(a));
+    }
+  };
+
+  template<typename T, bool hasNaN>                       //recursion end
+  class MultiTypeBlockVector_InfinityNorm<0,T, hasNaN> {
+  public:
+    typedef typename T::field_type field_type;
+    typedef typename FieldTraits<field_type>::real_type real_type;
+    static real_type result (const T&)
+    {
+      return 0.0;
+    }
+
+    static std::pair<real_type,real_type> resultHelper (const T&)
+    {
+      return {0.0, 1.0};
+    }
+  };
+
   /**
       @brief A Vector class to support different block types
 
@@ -256,7 +318,7 @@ namespace Dune {
     typedef double field_type;
 
     /** \brief Return the number of vector entries */
-    static DUNE_CONSTEXPR std::size_t size()
+    static constexpr std::size_t size()
     {
       return sizeof...(Args);
     }
@@ -376,6 +438,13 @@ namespace Dune {
     /** \brief Compute the Euclidean norm
      */
     typename FieldTraits<field_type>::real_type two_norm() const {return sqrt(this->two_norm2());}
+
+    /** \brief Compute the maximum norm
+     */
+    typename FieldTraits<field_type>::real_type infinity_norm() const
+    {
+      return MultiTypeBlockVector_InfinityNorm<sizeof...(Args),type>::result(*this);
+    }
 
     /** \brief Axpy operation on this vector (*this += a * y)
      *

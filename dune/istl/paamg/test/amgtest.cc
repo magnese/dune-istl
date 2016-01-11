@@ -129,13 +129,16 @@ void testAMG(int N, int coarsenTarget, int ml)
   criterion.setBeta(1.0e-4);
   criterion.setMaxLevel(ml);
   criterion.setSkipIsolated(false);
+  // specify pre/post smoother steps
+  criterion.setNoPreSmoothSteps(1);
+  criterion.setNoPostSmoothSteps(1);
 
   Dune::SeqScalarProduct<Vector> sp;
   typedef Dune::Amg::AMG<Operator,Vector,Smoother> AMG;
 
   Smoother smoother(mat,1,1);
 
-  AMG amg(fop, criterion, smootherArgs, 1, 1, 1, false);
+  AMG amg(fop, criterion, smootherArgs);
 
 
   double buildtime = watch.elapsed();
@@ -182,10 +185,15 @@ try
 
   testAMG<1>(N, coarsenTarget, ml);
   testAMG<2>(N, coarsenTarget, ml);
+
+  return 0;
 }
-catch (Dune::Exception &e)
+catch (std::exception &e)
 {
-  std::cerr << "Dune reported error: " << e << std::endl;
+  throw;
 }
 catch (...)
-{}
+{
+  std::cerr << "Dune reported an unknown error." << std::endl;
+  exit(1);
+}
